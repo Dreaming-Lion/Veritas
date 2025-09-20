@@ -23,8 +23,7 @@ Desktop.ini
 Icon?
 *.sw?
 *~
-# mac tarball noise
-._*
+._*  # mac tarball noise
 
 # -------- IDE/editor
 .vscode/*
@@ -35,19 +34,30 @@ Icon?
 .classpath
 .settings/
 
-# -------- Root/env
+# -------- Root/env & secrets (any depth)
+# 무조건 어떤 깊이든 .env 계열은 모두 무시 (예시는 허용)
 .env
+*.env
 .env.*
+*.env.*
+.envrc
+.env.local
+.env.development.local
+.env.production.local
 !.env.example
 !.env.*.example
+
+# 토큰이 들어갈 수 있는 설정들
+.npmrc
+.pypirc
 
 # =========================
 # Frontend (Vite + React + TS + Tailwind)
 # =========================
 
 # dependencies
-frontend/node_modules
 node_modules
+frontend/node_modules
 
 # build output
 dist
@@ -67,27 +77,21 @@ coverage-*
 .nyc_output
 jest-html-reporters-*
 
-# PostCSS/Tailwind (v4 uses @tailwindcss/postcss; no extra cache files by default)
-
 # =========================
 # Backend (Spring Boot + Gradle)
 # =========================
 
-# Gradle
-.gradle/
+# Gradle caches & builds
 **/.gradle/
-build/
 **/build/
-out/
 **/out/
 
-# Spring Boot native/build tooling
+# Spring Boot logs
 spring.log
 hs_err_pid*.log
 replay_pid*.log
 
 # Keep Gradle wrapper in repo (do NOT ignore)
-# (Just in case: ensure these are NOT ignored)
 !gradlew
 !gradlew.bat
 !gradle/wrapper/gradle-wrapper.jar
@@ -96,14 +100,13 @@ replay_pid*.log
 # Maven (if any module uses it)
 target/
 .mvn/timing.properties
-# Keep maven wrapper
+# Keep Maven wrapper
 !mvnw
 !mvnw.cmd
 !.mvn/wrapper/maven-wrapper.jar
 !.mvn/wrapper/maven-wrapper.properties
 
-# IntelliJ annotation processing
-.backend/**/generated/
+# Generated sources
 **/generated/
 
 # =========================
@@ -126,7 +129,7 @@ venv.bak/
 env.bak/
 .python-version
 
-# Python packaging / build
+# Packaging / build
 build/
 develop-eggs/
 dist/
@@ -164,7 +167,7 @@ docker-data/
 tmp/
 *.tmp
 
-# Named volumes are managed by Docker; if you also keep local data dirs, ignore them here:
+# Local data for named volumes (if kept alongside)
 db-data/
 frontend-node-modules/
 backend-gradle-cache/
@@ -173,7 +176,7 @@ ai-model-cache/
 # =========================
 # Misc
 # =========================
-# lockfiles SHOULD be committed (npm/yarn/pnpm), so do not ignore:
+# lockfiles SHOULD be committed (npm/yarn/pnpm) → ignore하지 않음
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
