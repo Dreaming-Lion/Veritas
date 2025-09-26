@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from bs4 import BeautifulSoup
-import psycopg2, requests, re, datetime
+import psycopg2, requests, re
+from datetime import datetime
 
 router = APIRouter()
 
@@ -35,7 +36,7 @@ def get_conn():
         password="apppw"
     )
 
-@router.get("/crawl")
+@router.get("/article/crawl")
 def crawl_news():
     url = "https://news.naver.com/section/100"
     res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}) # Header -> ConnectionError 방지
@@ -79,11 +80,11 @@ def crawl_news():
 
     return {"count": len(articles), "articles": articles}
 
-@router.get("/news")
+@router.get("/article")
 def get_news():
     conn = get_conn() # DB 연결
     cur = conn.cursor() # 커서 생성 -> 결과는 Result Set 형식으로 쌓임.
-    cur.execute("SELECT title, content, date, link FROM news ORDER BY date DESC LIMIT 20;") # title, content, date, link 출력
+    cur.execute("SELECT title, content, date, link FROM news ORDER BY date DESC") # title, content, date, link 출력
     # cur.fetchone() : 결과 집합에서 맨 위의 한 행만 가져옴.
     # cur.fetchmany(size) : 결과 집합에서 size 개수만큼 행 가져옴.
     rows = cur.fetchall() # 결과 집합의 남아 있는 모든 행을 가져옴. (각 row는 튜플 형태)
