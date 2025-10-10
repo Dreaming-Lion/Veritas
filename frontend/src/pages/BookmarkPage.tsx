@@ -2,8 +2,11 @@ import React from "react";
 import { Link } from "react-router-dom";
 import useBookmarks, { type Article } from "../hook/useBookmarks";
 
-/* ===== 공용 북마크 버튼 (MainPage 동일) ===== */
-const BookmarkButton: React.FC<{ saved: boolean; onToggle: () => void }> = ({ saved, onToggle }) => (
+/* ===== 공용 북마크 버튼 ===== */
+const BookmarkButton: React.FC<{ saved: boolean; onToggle: () => void }> = ({
+  saved,
+  onToggle,
+}) => (
   <button
     type="button"
     onMouseDown={(e) => e.preventDefault()}
@@ -17,7 +20,11 @@ const BookmarkButton: React.FC<{ saved: boolean; onToggle: () => void }> = ({ sa
                !bg-transparent !hover:bg-transparent !active:bg-transparent !focus:bg-transparent"
     aria-label={saved ? "북마크 해제" : "북마크"}
     title={saved ? "북마크 해제" : "북마크"}
-    style={{ WebkitTapHighlightColor: "transparent", border: "0 none", boxShadow: "none" }}
+    style={{
+      WebkitTapHighlightColor: "transparent",
+      border: "0 none",
+      boxShadow: "none",
+    }}
   >
     <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none">
       <path
@@ -37,11 +44,11 @@ const BookmarkButton: React.FC<{ saved: boolean; onToggle: () => void }> = ({ sa
 );
 
 /* ===== 뉴스 카드 ===== */
-const BookmarkCard: React.FC<{ item: Article; onToggle: (a: Article) => void; saved: boolean }> = ({
-  item,
-  onToggle,
-  saved,
-}) => (
+const BookmarkCard: React.FC<{
+  item: Article;
+  onToggle: (a: Article) => void;
+  saved: boolean;
+}> = ({ item, onToggle, saved }) => (
   <button
     type="button"
     className="
@@ -83,46 +90,54 @@ const BookmarkCard: React.FC<{ item: Article; onToggle: (a: Article) => void; sa
       {item.excerpt}
     </p>
 
-    {/* 푸터 */}
     <div className="mt-auto flex items-center justify-between text-sm pt-2">
       <span className="!text-gray-500">{item.press}</span>
       <span className="!text-green-600 font-semibold group-hover:translate-x-0.5 transition">
-        <Link to="/Detail" className="!text-green-600">자세히 보기 →</Link>
+        <Link to="/Detail" className="!text-green-600">
+          자세히 보기 →
+        </Link>
       </span>
     </div>
   </button>
 );
 
-/* ===== 빈 상태 카드 (동일한 구조) ===== */
 const EmptyCard: React.FC = () => (
-  <div
-    className="
-      group w-full text-left !bg-white rounded-xl shadow-sm
-      transition duration-200 ease-out transform
-      hover:shadow-lg active:shadow-lg focus:shadow-lg
-      hover:-translate-y-0.5 active:-translate-y-0.5 focus:-translate-y-0.5
-      !border-l-4 !border-green-500 !outline-none !focus:outline-none !focus:ring-0
-      p-4 h-full flex flex-col justify-between
-      min-w-[450px]
-    "
-  >
-    <div className="flex items-center justify-between mb-2">
-      <span className="text-xs text-gray-400">지금</span>
-      <span className="-mr-5.5 opacity-60 pointer-events-none">
-        <BookmarkButton saved={false} onToggle={() => {}} />
-      </span>
-    </div>
+  <div className="flex items-center justify-center h-[55vh] w-full">
+    <div
+      className="
+        bg-white border border-gray-200 rounded-xl shadow-md
+        p-8 text-center max-w-sm w-full
+        flex flex-col items-center justify-center
+      "
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-9 h-9 mb-2 text-gray-400"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.6}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M7 3h10a1 1 0 0 1 1 1v16l-6-3-6 3V4a1 1 0 0 1 1-1z"
+        />
+      </svg>
 
-    <h2 className="mb-2 font-semibold text-gray-800 text-base sm:text-lg">
-      북마크가 없습니다
-    </h2>
+      <h2 className="text-lg font-semibold text-gray-800 mb-1">
+        북마크가 없습니다
+      </h2>
+      <p className="text-sm text-gray-500 mb-3 leading-relaxed">
+        아직 북마크한 뉴스가 없습니다.
+        <br />
+        관심있는 뉴스를 북마크해보세요.
+      </p>
 
-    <p className="text-gray-600 text-sm leading-relaxed mb-4">
-      아직 북마크한 뉴스가 없습니다.<br />관심 있는 뉴스를 북마크해보세요.
-    </p>
-
-    <div className="mt-auto flex items-center justify-end text-sm pt-2">
-      <Link to="/" className="!text-green-600 font-semibold hover:translate-x-0.5 transition">
+      <Link
+        to="/"
+        className="!text-green-600 font-semibold hover:underline mt-1"
+      >
         뉴스 보러 가기 →
       </Link>
     </div>
@@ -134,7 +149,10 @@ const BookmarkPage: React.FC = () => {
   const { bookmarks, toggle, isSaved } = useBookmarks();
 
   return (
-    <main className="w-full">
+    <main
+      className="w-screen bg-white"
+      style={{ width: "calc(100vw - 32px)" }}
+    >
       <div
         className="
           w-full mx-auto
@@ -146,11 +164,24 @@ const BookmarkPage: React.FC = () => {
         {/* 헤더 */}
         <header className="mb-4 sm:mb-5 lg:mb-6 text-center">
           <div className="inline-flex items-center justify-center gap-2 text-gray-700">
-            <svg viewBox="0 0 24 24" className="w-4 h-4 text-green-600" fill="none" aria-hidden="true">
-              <path d="M7 3h10a1 1 0 0 1 1 1v16l-6-3-6 3V4a1 1 0 0 1 1-1z" stroke="currentColor" strokeWidth="1.8" />
+            <svg
+              viewBox="0 0 24 24"
+              className="w-4 h-4 text-green-600"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M7 3h10a1 1 0 0 1 1 1v16l-6-3-6 3V4a1 1 0 0 1 1-1z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              />
             </svg>
             <h2 className="font-semibold">북마크한 뉴스</h2>
-            {bookmarks.length > 0 && <span className="text-xs text-gray-400">({bookmarks.length})</span>}
+            {bookmarks.length > 0 && (
+              <span className="text-xs text-gray-400">
+                ({bookmarks.length})
+              </span>
+            )}
           </div>
           <p className="mt-1 text-sm text-gray-500">
             관심있는 뉴스를 저장하고 언제든지 다시 확인하세요.
@@ -159,13 +190,26 @@ const BookmarkPage: React.FC = () => {
 
         <hr className="my-4 sm:my-6 border-gray-200" />
 
-        {/* 반응형 그리드 (MainPage와 완전히 동일) */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-          {bookmarks.length === 0
-            ? <EmptyCard />
-            : bookmarks.map((a) => (
-                <BookmarkCard key={a.id} item={a} saved={isSaved(a.id)} onToggle={toggle} />
-              ))}
+        {/* 콘텐츠 영역 */}
+        <section
+          className={
+            bookmarks.length === 0
+              ? "flex items-center justify-center w-full"
+              : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6"
+          }
+        >
+          {bookmarks.length === 0 ? (
+            <EmptyCard />
+          ) : (
+            bookmarks.map((a) => (
+              <BookmarkCard
+                key={a.id}
+                item={a}
+                saved={isSaved(a.id)}
+                onToggle={toggle}
+              />
+            ))
+          )}
         </section>
       </div>
     </main>
