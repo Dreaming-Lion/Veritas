@@ -20,15 +20,15 @@ type BriefingInfo = { dept: string; date: string; title: string; summary: string
 const MOCK = {
   article: {
     id: 1,
-    title: "정부, 내년 예산안 총 657조원 규모로 국회 제출",
+    title: "尹 '나눠먹기식 재검토하라'…657조 예산안 심사 시작, 쟁점은",
     lead:
       "정부가 내년도 예산안을 총 657조원 규모로 편성해 국회에 제출했습니다. 전년 대비 2.8% 증가한 규모입니다.",
     time: "2시간 전",
     press: "중앙일보",
-    originalUrl: "https://news.example.com/article-1",
+    originalUrl: "https://www.joongang.co.kr/article/25203658",
     summary:
-      "정부가 2025년 예산안을 총 657조 3,000억원 규모로 편성해 국회에 제출했다고 밝혔습니다. 이는 올해 본예산 대비 2.8% 증가한 규모로, 복지와 안전 분야에 중점 투자하겠다는 정부 방침이 반영됐습니다.",
-  } as ArticleDetail,
+      "윤석열 대통령의 31일 국회 시정연설을 계기로 657조원 규모 내년도 예산안 심사가 시작됐다. 윤 대통령은 “2005년 이후 가장 낮은 수준(2.8%) 증가한 예산을 편성해 건전재정 기조를 유지했다”고 설명했다. 긴축 예산인 만큼 여야가 나눠 먹을 ‘파이’가 작은 데다, 정쟁이 극심해 통과까지 진통이 예상된다.\n\n예산안 심사는 11월 1일 전문가 공청회부터다. 3일부터 예산결산특별위원회 전체회의를 열어 정부 부처를 상대로 엿새간 정책 질의를 진행한다. 본격적인 세부 심사는 예결위 소위원회가 현미경을 들이댈 13일부터다. 소위에서 여야 예결위 간사와 기획재정부 차관 및 각 부처 관계자가 모여 예산 증감을 놓고 기 싸움을 펼친다. 14~17일 감액 심사, 20~24일 증액 심사 일정이 잡혀있다.\n\n헌법상 내년도 예산안 처리 시한은 12월 2일이다. 하지만 시한을 지키는 경우가 드물다. 보통 정부·여당이 야당의 공세를 방어하는 입장이다. 하지만 지난해는 대통령실에서 여야 합의안을 파기하는 등 주도권을 행사해 12월 24일 예산안을 통과시켰다. 홍익표 더불어민주당 원내대표는 30일 의원총회에서 “예산심사 과정에서 지난해와 같이 대통령실이 ‘감 놔라, 배 놔라’ 하면 아예 협의하지 않겠다”고 말했다.\n\n내년 예산안은 곳곳에서 윤석열 정부 색깔이 분명하게 드러난다. 대통령이 “나눠먹기식 예산 편성을 원점에서 재검토하라”고 주문한 연구개발(R&D) 예산은 25조9000억원으로 올해(31조원)보다 16.6% 깎였다. 마찬가지로 “무분별한 현금 살포는 하지 않겠다”고 강조한 일자리 예산도 같은 기간 30조3000억원→29조3000억원으로 3.5% 줄었다. 반면 도로·공항·철도 같은 사회간접자본(SOC) 예산은 24조9000억원→26조1000억원으로 4.6% 늘었다.\n\n야당은 예산 심사에서 R&D 예산 복원을 1순위 과제로 앞세웠다. 전담 태스크포스(TF)까지 만들어 대응한다. R&D 예산 수정에 대해선 정부도 일정 부분 공감대를 갖고 있다. 윤 대통령은 31일 시정연설에서 “R&D 예산 지출 조정 과정에서 제기되는 고용불안 등 우려에 대해 정부가 세심하고 꼼꼼하게 챙기고 보완책을 마련하겠다”고 말했다. 앞서 추경호 부총리도 기재부 국정감사에서 “(R&D 예산 감축과 관련해) 국회에서 제기하는 문제를 일부 살피지 못한 부분이 있을 것”이라며 “필요한 부분은 (예산 심사 과정에서) 경청하며 살피겠다”고 말했다.\n\n문제는 여야가 ‘강대 강’으로 양보 없이 부딪히는 부분이다. 새만금 세계잼버리대회 파행을 계기로 중앙부처 심사를 통과한 예산(6626억원)에서 75%(5147억원) 삭감한 새만금 SOC 예산(1479억원)이 대표적이다. 홍익표 민주당 원내대표는 “새만금 개발은 지역 예산이 아닌 산업과 경제 예산으로 다루고, 가장 먼저 복원하겠다”고 강조했다. 이재명 대표가 밀어붙였지만, 전액 삭감한 지역화폐 예산도 마찬가지로 복원을 벼르고 있다. 야당이 11월 국회 본회의에서 법안 통과를 강행할 예정인 ‘노란봉투법’과 ‘방송3법’ 처리를 예산안 처리와 연계할 경우 난관이 예상된다.\n\n4년마다 열리는 총선을 앞둔 예산 심사라 선심성·짬짜미 예산 증액 ‘고질(痼疾)’이 재현할 가능성도 있다. 예산 심사가 표류할 경우 국회 예결위원장과 여야 간사 3명이 참여하는 비공개 ‘소(小)소위’에서 진행하는 ‘밀실 심사’가 우려된다. 여야를 막론한 민원성 ‘쪽지 예산’ 편성 경쟁이 이어질 경우 지역 SOC 예산이 증액될 가능성도 있다."
+    } as ArticleDetail,
   claim: { text: "복지와 안전 분야 투자 확대를 통한 국민 생활 안정 도모" } as KeyClaim,
   opposing: {
     title: "야당, 657조 예산안 '포퓰리즘' 비판",
@@ -131,7 +131,7 @@ const ArticleDetailPage: React.FC = () => {
   const { article, claim, opposing, bill, briefing } = MOCK;
 
   return (
-    <div className="w-full">
+    <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-24">
       {/* 컨테이너: 데스크탑에서 거의 꽉 차게 */}
       <div className="mx-auto w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-14 max-w-[1600px] 2xl:max-w-[1920px] py-6">
         {/* ===== 상단 헤더 ===== */}
@@ -139,17 +139,23 @@ const ArticleDetailPage: React.FC = () => {
           <div className="flex items-center justify-between text-sm text-gray-500">
             <button
               onClick={() => navi(-1)}
-              className="inline-flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-100 transition focus:outline-none focus:ring-0"
+              className="inline-flex items-center gap-2 px-2 py-1 rounded transition hover:bg-gray-100
+                        !border !border-0 hover:!border-0
+                        !outline-none focus:!outline-none focus-visible:!outline-none
+                        !ring-0 focus:!ring-0 focus-visible:!ring-0 ring-offset-0
+                        shadow-none hover:shadow-none focus:shadow-none
+                        [--tw-ring-shadow:0_0_0_0_transparent]"
             >
               {Icon.back}
               <span>뉴스 목록으로 돌아가기</span>
             </button>
+
             <span>{article.time}</span>
           </div>
 
           {/* 제목/리드/출처만 좌측 패딩 추가 */}
           <div className="mt-3 pl-3 sm:pl-4 md:pl-5 lg:pl-6 xl:pl-8">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight">
+            <h1 className="!text-[22px] sm:!text-[20px] md:!text-[26px] lg:!text-[28px] xl:!text-[30px] 2xl:!text-[32px] font-extrabold text-gray-900 leading-tight">
               {article.title}
             </h1>
             <p className="mt-3 text-gray-600">{article.lead}</p>
@@ -292,20 +298,11 @@ const ArticleDetailPage: React.FC = () => {
                 }
               />
               <div className="p-5">
-                <p className="text-gray-700 leading-7">{article.summary}</p>
+                <p className="text-gray-700 leading-7 whitespace-pre-line">{article.summary}</p>
 
                 <hr className="my-4 border-gray-100" />
 
                 <p className="text-sm text-gray-500">전체 기사는 원문에서 확인하실 수 있습니다.</p>
-
-                <a
-                  href={article.originalUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-3 inline-flex items-center gap-1 !text-green-600 font-semibold hover:underline focus:outline-none focus:ring-0"
-                >
-                  → {article.press} 원문 보러가기
-                </a>
               </div>
             </Card>
           </div>

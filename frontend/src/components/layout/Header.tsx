@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useAuthDialog } from "../auth/AuthDialogProvider";
 
 const Header: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -7,6 +8,9 @@ const Header: React.FC = () => {
   const [mAboutOpen, setMAboutOpen] = useState(false);
   const hoverTimer = useRef<number | null>(null);
   const { pathname } = useLocation();
+
+  // ✅ 모달 훅 (Provider에서 제공)
+  const { open: openAuth } = useAuthDialog();
 
   useEffect(() => {
     setAboutOpen(false);
@@ -61,19 +65,23 @@ const Header: React.FC = () => {
       <div className="w-full h-16 px-4 sm:px-6 lg:px-10 flex items-center">
         <div className="w-full flex items-center justify-between md:grid md:grid-cols-3 md:gap-4">
           {/* 로고 */}
-          <div className="flex items-center gap-2">
-            <div className="bg-green-500 text-white w-9 h-9 rounded-full flex items-center justify-center font-bold">V</div>
-            <span className="text-xl font-extrabold text-green-600 tracking-tight">Veritas</span>
-          </div>
+          <Link to="/">
+            <div className="flex items-center gap-2">
+              <div className="bg-green-500 text-white w-9 h-9 rounded-full flex items-center justify-center font-bold">V</div>
+              <span className="text-xl font-extrabold text-green-600 tracking-tight">Veritas</span>
+            </div>
+          </Link>
 
-          {/* 데스크탑 네비 */}
-          <nav className="hidden md:block relative">
+          {/* 데스크탑 네비: lg부터 표시 */}
+          <nav className="hidden lg:block relative">
             <ul className="flex justify-center items-center gap-4">
               <li>
                 <Link to="/" className={navPill(activeHome)}>
                   <svg viewBox="0 0 24 24" className={iconCls} fill="none">
-                    <path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-10.5z"
-                          stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-10.5z"
+                      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+                    />
                   </svg>
                   HOME
                 </Link>
@@ -82,8 +90,10 @@ const Header: React.FC = () => {
               <li>
                 <Link to="/bookmarks" className={navPill(activeBookmarks)}>
                   <svg viewBox="0 0 24 24" className={iconCls} fill="none">
-                    <path d="M7 3h10a1 1 0 0 1 1 1v16l-6-3-6 3V4a1 1 0 0 1 1-1z"
-                          stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M7 3h10a1 1 0 0 1 1 1v16l-6-3-6 3V4a1 1 0 0 1 1-1z"
+                      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+                    />
                   </svg>
                   Bookmarks
                 </Link>
@@ -91,12 +101,15 @@ const Header: React.FC = () => {
 
               <li>
                 <Link to="/guide" className={navPill(activeGuide)}>
-                  {/* Guide: 책 아이콘 */}
                   <svg viewBox="0 0 24 24" className={iconCls} fill="none">
-                    <path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H11v14H5.5A2.5 2.5 0 0 1 3 15.5v-9Z"
-                          stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M21 6.5A2.5 2.5 0 0 0 18.5 4H13v14h5.5A2.5 2.5 0 0 0 21 15.5v-9Z"
-                          stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path
+                      d="M3 6.5A2.5 2.5 0 0 1 5.5 4H11v14H5.5A2.5 2.5 0 0 1 3 15.5v-9Z"
+                      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+                    />
+                    <path
+                      d="M21 6.5A2.5 2.5 0 0 0 18.5 4H13v14h5.5A2.5 2.5 0 0 0 21 15.5v-9Z"
+                      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+                    />
                   </svg>
                   Guide
                 </Link>
@@ -109,11 +122,10 @@ const Header: React.FC = () => {
                 onMouseLeave={closeWithDelay}
               >
                 <Link to="/about" className={navPill(activeAbout)}>
-                  {/* About: 사용자 배지 아이콘 */}
                   <svg viewBox="0 0 24 24" className={iconCls} fill="none">
-                    <rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" strokeWidth="1.8"/>
-                    <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="1.8"/>
-                    <path d="M7 19a5 5 0 0 1 10 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                    <rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" strokeWidth="1.8" />
+                    <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="1.8" />
+                    <path d="M7 19a5 5 0 0 1 10 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                   </svg>
                   About
                 </Link>
@@ -128,14 +140,12 @@ const Header: React.FC = () => {
                       to="/about/mypage"
                       className={[
                         "flex items-center gap-2 px-3 py-2 text-sm font-semibold transition",
-                        activeMyPage
-                          ? "bg-green-500 !text-white visited:!text-white"
-                          : "!text-gray-700 hover:bg-gray-50"
+                        activeMyPage ? "bg-green-500 !text-white visited:!text-white" : "!text-gray-700 hover:bg-gray-50",
                       ].join(" ")}
                     >
                       <svg viewBox="0 0 24 24" className={iconCls} fill="none">
-                        <circle cx="12" cy="8.5" r="3" stroke="currentColor" strokeWidth="1.8"/>
-                        <path d="M5 19.5a7 7 0 0 1 14 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        <circle cx="12" cy="8.5" r="3" stroke="currentColor" strokeWidth="1.8" />
+                        <path d="M5 19.5a7 7 0 0 1 14 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                       </svg>
                       MyPage
                     </Link>
@@ -144,14 +154,12 @@ const Header: React.FC = () => {
                       to="/about/inquiry"
                       className={[
                         "flex items-center gap-2 px-3 py-2 text-sm font-semibold transition",
-                        activeInquiry
-                          ? "bg-green-500 !text-white visited:!text-white"
-                          : "!text-gray-700 hover:bg-gray-50"
+                        activeInquiry ? "bg-green-500 !text-white visited:!text-white" : "!text-gray-700 hover:bg-gray-50",
                       ].join(" ")}
                     >
                       <svg viewBox="0 0 24 24" className={iconCls} fill="none">
-                        <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/>
-                        <path d="M3.5 6l8.5 6 8.5-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.8" />
+                        <path d="M3.5 6l8.5 6 8.5-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                       Inquiry
                     </Link>
@@ -163,41 +171,42 @@ const Header: React.FC = () => {
 
           {/* 우측: 로그인/회원가입 + 햄버거 */}
           <div className="flex items-center gap-3 md:justify-end justify-end md:col-start-3">
-            <div className="hidden md:flex items-center gap-3">
-              <Link
-                to="/login"
-                className="inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded
-                           !text-gray-600 [&:link]:!text-gray-600 [&:visited]:!text-gray-600
-                           hover:text-green-600 transition"
+            <div className="hidden lg:flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => openAuth("login")}
+                className="inline-flex items-center gap-2 !bg-white px-3 py-1.5 rounded
+                           !text-gray-600 hover:text-green-600 transition hover:!border-0"
               >
                 <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
                   <path d="M5 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5"
-                        stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                   <path d="M12 12h8M16 8l4 4-4 4"
-                        stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 로그인
-              </Link>
+              </button>
 
-              <Link
-                to="/signup"
-                className="inline-flex items-center gap-2 rounded-full border border-green-500 bg-white
-                           !text-green-600 [&:link]:!text-green-600 [&:visited]:!text-green-600
-                           px-4 py-1.5 hover:bg-green-50 transition"
+              <button
+                type="button"
+                onClick={() => openAuth("signup")}
+                className="inline-flex items-center gap-2 rounded-full border !border-green-500 bg-white
+                           !text-green-600 px-4 py-1.5 hover:!bg-green-50 transition hover:!border-green-500"
               >
                 <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
                   <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"
-                        stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                   <path d="M4 20a8 8 0 1 1 16 0"
-                        stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 회원가입
-              </Link>
+              </button>
             </div>
 
+            {/* 햄버거: 모바일+태블릿에서 표시 */}
             <button
               onClick={() => setOpen(v => !v)}
-              className="md:hidden p-2 rounded hover:bg-gray-100 text-gray-700 ml-2"
+              className="lg:hidden p-2 rounded hover:bg-gray-100 text-gray-700 ml-2"
               aria-label="toggle menu"
             >
               {open ? (
@@ -214,8 +223,8 @@ const Header: React.FC = () => {
         </div>
       </div>
 
-      {/* 모바일 드롭다운 (그대로) */}
-      <div className={`${open ? "block" : "hidden"} md:hidden border-t bg-white`}>
+      {/* 모바일/태블릿 드롭다운 */}
+      <div className={`${open ? "block" : "hidden"} lg:hidden border-t bg-white`}>
         <ul className="px-4 py-3 space-y-2">
           <li>
             <Link to="/" onClick={() => setOpen(false)} className={mobileCard(activeHome)}>
@@ -235,7 +244,7 @@ const Header: React.FC = () => {
             </Link>
           </li>
 
-          {/* About + MyPage + Inquiry (모바일) */}
+          {/* About + MyPage + Inquiry (모바일/태블릿) */}
           <li className="space-y-2">
             <div className="relative">
               <Link to="/about" onClick={() => setOpen(false)} className={mobileCard(activeAbout)}>
@@ -245,6 +254,7 @@ const Header: React.FC = () => {
                 onClick={() => setMAboutOpen(v => !v)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
                 aria-label="toggle about submenu"
+                aria-expanded={mAboutOpen}
               >
                 <svg viewBox="0 0 24 24" className={`w-5 h-5 transition-transform ${mAboutOpen ? "rotate-180" : ""}`}>
                   <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -254,57 +264,34 @@ const Header: React.FC = () => {
 
             {mAboutOpen && (
               <>
-                <Link
-                  to="/about/mypage"
-                  onClick={() => setOpen(false)}
-                  className={`ml-6 ${mobileCard(activeMyPage)}`}
-                >
+                <Link to="/about/mypage" onClick={() => setOpen(false)} className={`ml-6 ${mobileCard(activeMyPage)}`}>
                   MyPage
                 </Link>
-                <Link
-                  to="/about/inquiry"
-                  onClick={() => setOpen(false)}
-                  className={`ml-6 ${mobileCard(activeInquiry)}`}
-                >
+                <Link to="/about/inquiry" onClick={() => setOpen(false)} className={`ml-6 ${mobileCard(activeInquiry)}`}>
                   Inquiry
                 </Link>
               </>
             )}
           </li>
 
-          {/* 모바일 로그인/회원가입 */}
           <li className="pt-2 flex gap-3">
-            <Link
-              to="/login"
-              onClick={() => setOpen(false)}
+            <button
+              type="button"
+              onClick={() => { openAuth("login"); setOpen(false); }}
               className="flex-1 inline-flex justify-center items-center gap-2 bg-white px-3 py-2 rounded
-                         !text-gray-600 [&:link]:!text-gray-600 [&:visited]:!text-gray-600
-                         hover:text-green-600 transition"
+                         !text-gray-600 hover:text-green-600 transition"
             >
-              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-                <path d="M5 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5"
-                      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M12 12h8M16 8l4 4-4 4"
-                      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
               로그인
-            </Link>
+            </button>
 
-            <Link
-              to="/signup"
-              onClick={() => setOpen(false)}
+            <button
+              type="button"
+              onClick={() => { openAuth("signup"); setOpen(false); }}
               className="flex-1 inline-flex justify-center items-center gap-2 rounded-full border border-green-500 bg-white
-                         !text-green-600 [&:link]:!text-green-600 [&:visited]:!text-green-600
-                         px-3 py-2 hover:bg-green-50 transition"
+                         !text-green-600 px-3 py-2 hover:bg-green-50 transition"
             >
-              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-                <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"
-                      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M4 20a8 8 0 1 1 16 0"
-                      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
               회원가입
-            </Link>
+            </button>
           </li>
         </ul>
       </div>
