@@ -26,8 +26,8 @@ const Header: React.FC = () => {
   const activeBookmarks = isStarts("/bookmarks");
   const activeGuide = isStarts("/guide");
   const activeAbout = isExact("/about");
-  const activeMyPage = isStarts("/about/mypage");
-  const activeInquiry = isStarts("/about/inquiry");
+  const activeMyPage = isStarts("/mypage");
+  const activeInquiry = isStarts("/inquiry");
 
   // 공용 아이콘 클래스(크기 통일)
   const iconCls = "w-4 h-4 shrink-0";
@@ -137,7 +137,7 @@ const Header: React.FC = () => {
                     onMouseLeave={closeWithDelay}
                   >
                     <Link
-                      to="/about/mypage"
+                      to="/mypage"
                       className={[
                         "flex items-center gap-2 px-3 py-2 text-sm font-semibold transition",
                         activeMyPage ? "bg-green-500 !text-white visited:!text-white" : "!text-gray-700 hover:bg-gray-50",
@@ -151,7 +151,7 @@ const Header: React.FC = () => {
                     </Link>
 
                     <Link
-                      to="/about/inquiry"
+                      to="/inquiry"
                       className={[
                         "flex items-center gap-2 px-3 py-2 text-sm font-semibold transition",
                         activeInquiry ? "bg-green-500 !text-white visited:!text-white" : "!text-gray-700 hover:bg-gray-50",
@@ -264,10 +264,10 @@ const Header: React.FC = () => {
 
             {mAboutOpen && (
               <>
-                <Link to="/about/mypage" onClick={() => setOpen(false)} className={`ml-6 ${mobileCard(activeMyPage)}`}>
+                <Link to="/mypage" onClick={() => setOpen(false)} className={`ml-6 ${mobileCard(activeMyPage)}`}>
                   MyPage
                 </Link>
-                <Link to="/about/inquiry" onClick={() => setOpen(false)} className={`ml-6 ${mobileCard(activeInquiry)}`}>
+                <Link to="/inquiry" onClick={() => setOpen(false)} className={`ml-6 ${mobileCard(activeInquiry)}`}>
                   Inquiry
                 </Link>
               </>
