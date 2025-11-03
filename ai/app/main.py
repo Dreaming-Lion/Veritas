@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from app.api.crawl import crawl_news, router as crawl_router
 from app.api.opposite import router as recommend_router
+from app.api.rss_crawl import crawl_rss, router as rss_router
 # apscheduler는 파이썬에서 일정 관리를 위해 활용하는 라이브러리 !
 # 여기서는 주기적으로 뉴스 기사 크롤링 함수를 실행해 DB에 저장하기 위해 활용함.
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -8,13 +9,18 @@ from app.model.model import load_model
 
 app = FastAPI(title="Veritas AI", version="0.1.0")
 
-def job():
-    print("뉴스 크롤링 시작")
+def job_naver():
+    print("네이버 뉴스 크롤링 시작")
     crawl_news()
+
+def job_rss():
+    print("RSS 뉴스 크롤링 시작")
+    crawl_rss()
 
 def start_scheduler():
     scheduler = BackgroundScheduler()
-    scheduler.add_job(job, "interval", minutes=60)
+    scheduler.add_job(job_naver, "interval", minutes=60, id="naver_job", max_instances=1, coalesce=True)
+    scheduler.add_job(job_rss, "interval", minutes=60, id="rss_job",   max_instances=1, coalesce=True)
     scheduler.start()
 
 @app.on_event("startup")
@@ -32,5 +38,6 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
-app.include_router(crawl_router, prefix="/api") 
+app.include_router(crawl_router, prefix="/api")
+app.include_router(rss_router, prefix="/api")
 app.include_router(recommend_router, prefix="/api") 

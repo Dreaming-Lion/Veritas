@@ -1,51 +1,62 @@
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import torch
+import torch, torch.nn.functional as F
 
-MODEL_NAME = "Huffon/klue-roberta-base-nli"
-LABELS = ["entailment", "neutral", "contradiction"]
-
-tokenizer = None
-model = None
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+_MODEL_NAME = "MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7"
+_tokenizer = None
+_model = None
+_LABELS = ["entailment", "neutral", "contradiction"]
 
 def load_model():
-    global tokenizer, model
-    if tokenizer is None or model is None:
-        tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-        model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
-        model.to(device)
+    global _tokenizer, _model
+    if _model is None:
+        _tokenizer = AutoTokenizer.from_pretrained(_MODEL_NAME, use_fast=True)
+        _model = AutoModelForSequenceClassification.from_pretrained(_MODEL_NAME)
+        _model.eval()
+    return True
 
-def nli_infer(premise, hypothesis):
-    if not premise or not hypothesis:
-        return "neutral", [0.33, 0.33, 0.33]
-
-    # 토큰화
-    inputs = tokenizer(
-        premise,
-        hypothesis,
-        return_tensors="pt",
-        truncation=True,
-        max_length=512
+def _safe_pair(premise: str, hypothesis: str):
+    """모델 max position에 맞춰 토큰 기준으로 안전하게 자르기"""
+    max_pos = getattr(_model.config, "max_position_embeddings", 512)
+    max_len = max_pos - 3
+    enc = _tokenizer(
+        premise, hypothesis,
+        add_special_tokens=True,
+        truncation="longest_first",
+        max_length=max_len,
+        return_tensors=None
     )
 
-    # token_type_ids 제거 (RoBERTa는 segment embedding 안 씀)
-    if "token_type_ids" in inputs:
-        del inputs["token_type_ids"]
+    if len(enc["input_ids"]) > max_pos:
 
-    # 안전 장치: vocab 범위 확인
-    vocab_size = model.config.vocab_size
-    max_token_id = inputs["input_ids"].max().item()
-    if max_token_id >= vocab_size:
-        print(f"[WARN] vocab mismatch: max token id {max_token_id} >= vocab_size {vocab_size}")
-        return "neutral", [0.33, 0.33, 0.33]
+        p_ids = _tokenizer.encode(premise, add_special_tokens=False)
+        h_ids = _tokenizer.encode(hypothesis, add_special_tokens=False)
 
-    # 디바이스 강제 맞추기
-    inputs = {k: v.to(device) for k, v in inputs.items()}
-    model.to(device)
+        while len(p_ids) + len(h_ids) + 3 > max_len:
+            if len(p_ids) >= len(h_ids):
+                p_ids = p_ids[:-1]
+            else:
+                h_ids = h_ids[:-1]
+        premise = _tokenizer.decode(p_ids, skip_special_tokens=True)
+        hypothesis = _tokenizer.decode(h_ids, skip_special_tokens=True)
+    return premise, hypothesis
 
-    # 추론
-    with torch.no_grad():
-        outputs = model(**inputs)
-        probs = torch.softmax(outputs.logits, dim=-1)[0]
-        label = LABELS[probs.argmax()]
-    return label, probs.tolist()
+@torch.no_grad()
+def nli_infer(premise: str, hypothesis: str):
+    global _tokenizer, _model
+    if _model is None:
+        load_model()
+    if not premise or not hypothesis:
+        return "neutral", [0.33, 0.34, 0.33]
+
+    premise, hypothesis = _safe_pair(premise, hypothesis)
+
+    inputs = _tokenizer(
+        premise, hypothesis,
+        return_tensors="pt",
+        truncation="longest_first",
+        max_length=min(getattr(_model.config, "max_position_embeddings", 512) - 3, 510)
+    )
+    logits = _model(**inputs).logits
+    probs = F.softmax(logits, dim=-1).cpu().tolist()[0]
+    label = _LABELS[int(probs.index(max(probs)))]
+    return label, probs

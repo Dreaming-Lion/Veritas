@@ -12,3 +12,8 @@ transformers
 torch
 summa
 protobuf>=3.20,<5
+feedparser
+trafilatura
+python-dateutil
+scikit-learn
+pandas
