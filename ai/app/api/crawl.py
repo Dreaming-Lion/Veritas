@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from bs4 import BeautifulSoup
 import psycopg2, requests, re
-from datetime import datetime
+from datetime import datetime, date
 
 router = APIRouter()
 
@@ -81,24 +81,34 @@ def crawl_news():
     return {"count": len(articles), "articles": articles}
 
 @router.get("/article")
-def get_news():
+def get_news(limit: int = 50, offset: int = 0):
     conn = get_conn() # DB 연결
     cur = conn.cursor() # 커서 생성 -> 결과는 Result Set 형식으로 쌓임.
-    cur.execute("SELECT title, content, date, link FROM news ORDER BY date DESC") # title, content, date, link 출력
+    cur.execute("""
+        SELECT title, content, date, link
+        FROM news
+        ORDER BY COALESCE(date, 'epoch'::timestamptz) DESC NULLS LAST
+        LIMIT %s OFFSET %s
+    """, (limit, offset))
     # cur.fetchone() : 결과 집합에서 맨 위의 한 행만 가져옴.
     # cur.fetchmany(size) : 결과 집합에서 size 개수만큼 행 가져옴.
     rows = cur.fetchall() # 결과 집합의 남아 있는 모든 행을 가져옴. (각 row는 튜플 형태)
     cur.close()
     conn.close()
 
-    # JSON 변환
-    news_list = []
-    for row in rows:
-        news_list.append({
-            "title": row[0],
-            "content": row[1],
-            "date": row[2],
-            "link": row[3]
+    articles = []
+    for title, content, dt, link in rows:
+        # ★ datetime/date → ISO 문자열로 변환
+        if isinstance(dt, (datetime, date)):
+            dt_str = dt.isoformat()
+        else:
+            dt_str = None
+
+        articles.append({
+            "title": title or "",
+            "content": content or "",
+            "date": dt_str,
+            "link": link or "",
         })
 
-    return {"count": len(news_list), "articles": news_list}
+    return {"count": len(articles), "articles": articles}

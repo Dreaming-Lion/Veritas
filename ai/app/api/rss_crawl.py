@@ -4,7 +4,6 @@ import time
 from datetime import datetime, timedelta, timezone
 from dateutil import parser as dtparser
 from typing import Optional, List, Dict, Any
-
 import feedparser
 import httpx
 import psycopg2
