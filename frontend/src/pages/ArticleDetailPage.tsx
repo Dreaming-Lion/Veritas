@@ -155,11 +155,10 @@ const ArticleDetailPage: React.FC = () => {
 
           {/* 제목/리드/출처만 좌측 패딩 추가 */}
           <div className="mt-3 pl-3 sm:pl-4 md:pl-5 lg:pl-6 xl:pl-8">
-            <h1 className="!text-[22px] sm:!text-[20px] md:!text-[26px] lg:!text-[28px] xl:!text-[30px] 2xl:!text-[32px] font-extrabold text-gray-900 leading-tight">
+            <br />
+            <h1 className="!text-[22px] sm:!text-[20px] md:!text-[26px] lg:!text-[28px] xl:!text-[30px] 2xl:!text-[40px] font-extrabold text-gray-900 leading-tight">
               {article.title}
-            </h1>
-            <p className="mt-3 text-gray-600">{article.lead}</p>
-            <p className="mt-3 text-sm text-gray-400">출처: {article.press}</p>
+            </h1><br />
           </div>
         </div>
 

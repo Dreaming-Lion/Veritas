@@ -1,28 +1,39 @@
 // MainPage.tsx
 import React from "react";
+import { Link } from "react-router-dom";
 import useBookmarks, { type Article } from "../hook/useBookmarks";
 
-// 서버 응답 타입 (예시와 동일)
 type ApiArticle = {
   title: string;
   content?: string | null;
   summary?: string | null;
-  date?: string | null;   // ISO or null
+  date?: string | null;
   link: string;
 };
 
-type ArticleEx = Article & { link: string };
+type BackendListResponse = { count: number; articles: ApiArticle[] };
+
+type ArticleEx = Article & {
+  link: string;
+  content?: string | null;
+};
 
 const idFromLink = (link: string) =>
   Array.from(link).reduce((acc, ch) => (acc * 33 + ch.charCodeAt(0)) >>> 0, 5381);
+
+// VITE_API_BASE가 있으면 절대경로, 없으면 /api 프록시 사용
+const apiUrl = (path: string) => {
+  const base = import.meta.env.VITE_API_BASE as string | undefined;
+  return base ? `${base}${path}` : `/api${path}`;
+};
 
 const BookmarkButton: React.FC<{ saved: boolean; onToggle: () => void }> = ({ saved, onToggle }) => (
   <button
     type="button"
     onMouseDown={(e) => e.preventDefault()}
     onFocus={(e) => (e.currentTarget as HTMLButtonElement).blur()}
-    onClick={(e) => { e.stopPropagation(); onToggle(); }}
-    className="p-1.5 rounded appearance-none outline-none ring-0 border-0 !bg-transparent"
+    onClick={() => { onToggle(); }}
+    className="p-1.5 rounded appearance-none !outline-none ring-0 !border-0 !bg-transparent"
     aria-label={saved ? "북마크 해제" : "북마크"}
     title={saved ? "북마크 해제" : "북마크"}
   >
@@ -41,10 +52,9 @@ const Card: React.FC<{ item: ArticleEx }> = ({ item }) => {
   const saved = isSaved(item.id);
 
   return (
-    <a
-      href={item.link}
-      target="_blank"
-      rel="noopener noreferrer"
+    <Link
+      to={`/Detail/${item.id}`}
+      state={{ item }} // 상세에서 사용
       className="group w-full text-left !bg-white rounded-xl shadow-sm transition hover:shadow-lg
                  hover:-translate-y-0.5 p-4 h-full flex flex-col !border-l-4 !border-green-500"
     >
@@ -69,54 +79,66 @@ const Card: React.FC<{ item: ArticleEx }> = ({ item }) => {
           자세히 보기 →
         </span>
       </div>
-    </a>
+    </Link>
   );
 };
 
 const MainPage: React.FC = () => {
+  const [allItems, setAllItems] = React.useState<ArticleEx[]>([]);
   const [items, setItems] = React.useState<ArticleEx[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [query, setQuery] = React.useState("");
 
-  React.useEffect(() => {
-    const run = async () => {
-      setLoading(true);
-      try {
-        const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
-
-        const res = await fetch('/api/article'); 
-        const j = await res.json();
-        const list: ApiArticle[] = j.articles ?? [];
-
-        const toExcerpt = (a: ApiArticle) => {
-          const base = (a.summary ?? a.content ?? "").replace(/\s+/g, " ").trim();
-          return base.length > 50 ? base.slice(0, 50) + "…" : base;
-        };
-
-        const mapped: ArticleEx[] = list.map((a) => ({
-          id: idFromLink(a.link),
-          title: a.title,
-          excerpt: toExcerpt(a),
-          time: a.date ?? "",          // 요청대로: time에는 date 그대로
-          press: "네이버 뉴스",        // 요청대로 고정
-          link: a.link,                // 카드 전체 a 태그로 연결
-        }));
-
-        setItems(mapped);
-      } catch (e) {
-        console.error(e);
-        setItems([]);
-      } finally {
-        setLoading(false);
-      }
+  const mapArticles = (list: ApiArticle[]): ArticleEx[] => {
+    const toExcerpt = (a: ApiArticle) => {
+      const base = (a.summary ?? a.content ?? "").replace(/\s+/g, " ").trim();
+      return base.length > 50 ? base.slice(0, 50) + "…" : base || "본문 미리보기가 없습니다.";
     };
-    run();
+    return list.map((a) => ({
+      id: idFromLink(a.link),
+      title: a.title,
+      excerpt: toExcerpt(a),
+      time: a.date ?? "",
+      press: "네이버 뉴스",
+      link: a.link,
+      content: a.content ?? null, // 상세에서 사용
+    }));
+  };
+
+  const loadArticles = React.useCallback(async () => {
+    setLoading(true);
+    const ac = new AbortController();
+    try {
+      const res = await fetch(apiUrl("/article?limit=50&offset=0"), {
+        headers: { Accept: "application/json" },
+        signal: ac.signal,
+      });
+      if (!res.ok) throw new Error(`GET /article 실패 (status ${res.status})`);
+      const j: BackendListResponse = await res.json();
+      const mapped = mapArticles(j.articles ?? []);
+      setAllItems(mapped);
+      setItems(mapped);
+    } catch (e) {
+      console.error(e);
+      setAllItems([]);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+    return () => ac.abort();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: 검색 붙일 때 구현
-  };
+  React.useEffect(() => { loadArticles(); }, [loadArticles]);
+
+  React.useEffect(() => {
+    if (!query.trim()) { setItems(allItems); return; }
+    const q = query.trim().toLowerCase();
+    setItems(allItems.filter(
+      (it) => it.title.toLowerCase().includes(q) || it.excerpt.toLowerCase().includes(q)
+    ));
+  }, [query, allItems]);
+
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); };
 
   return (
     <div className="w-screen px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30" style={{ width: "calc(100vw - 32px)" }}>
@@ -141,7 +163,10 @@ const MainPage: React.FC = () => {
           </div>
           <button
             type="submit"
-            className="rounded-xl bg-green-500 text-white px-5 !py-3 font-medium !bg-green-600 !border-0 active:translate-y-px"
+            className="rounded-xl !bg-green-600 text-white px-5 !py-3 font-medium !border-0
+             !active:translate-y-px !outline-none !focus:outline-none
+             !focus-visible:ring-2 !focus-visible:ring-green-500
+             !focus-visible:ring-offset-2 !focus-visible:ring-offset-white"
             aria-label="검색"
             title="검색"
           >
@@ -156,9 +181,7 @@ const MainPage: React.FC = () => {
         <div className="text-sm text-gray-500">불러오는 중…</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-          {items.map((a) => (
-            <Card key={a.id} item={a} />
-          ))}
+          {items.map((a) => (<Card key={a.id} item={a} />))}
         </div>
       )}
     </div>
@@ -166,4 +189,3 @@ const MainPage: React.FC = () => {
 };
 
 export default MainPage;
-

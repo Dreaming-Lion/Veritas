@@ -9,7 +9,6 @@ const Header: React.FC = () => {
   const hoverTimer = useRef<number | null>(null);
   const { pathname } = useLocation();
 
-  // ✅ 모달 훅 (Provider에서 제공)
   const { open: openAuth } = useAuthDialog();
 
   useEffect(() => {

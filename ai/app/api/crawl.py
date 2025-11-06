@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from bs4 import BeautifulSoup
-import psycopg2, requests, re
+import psycopg2, requests, re, os
 from datetime import datetime, date
 
 router = APIRouter()
@@ -30,41 +30,44 @@ def get_conn():
     # conn.commit() : 커밋 (DB 저장)
     # cur.close(); conn.close(); # 연결 종료
     return psycopg2.connect(
-        host="Veritas-db",
-        dbname="appdb",
-        user="appuser",
-        password="apppw"
+        host=os.getenv("PGHOST", "db"),          # 기본: db (compose 서비스명)
+        dbname=os.getenv("PGDATABASE", "appdb"),
+        user=os.getenv("PGUSER", "appuser"),
+        password=os.getenv("PGPASSWORD", "apppw"),
+        port=int(os.getenv("PGPORT", "5432")),
     )
+
 
 @router.get("/article/crawl")
 def crawl_news():
+    init_db()
+
     url = "https://news.naver.com/section/100"
-    res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}) # Header -> ConnectionError 방지
-    soup = BeautifulSoup(res.text, "html.parser") # HTML 파싱
+    res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    soup = BeautifulSoup(res.text, "html.parser")
 
     articles = []
     for item in soup.select("div.sa_text"):
-        title = item.select_one("a.sa_text_title").get_text(strip=True)
-        link = item.select_one("a.sa_text_title")["href"]
+        a = item.select_one("a.sa_text_title")
+        if not a:
+            continue
+        title = a.get_text(strip=True)
+        link = a.get("href", "")
 
         news_res = requests.get(link, headers={"User-Agent": "Mozilla/5.0"})
         news_html = BeautifulSoup(news_res.text, "html.parser")
 
-        content = news_html.select("article#dic_area")
-        if not content:
-            content = news_html.select("#articeBody")
-        content = ''.join(str(content))
-        content = re.sub('<[^>]*>', '', content)
+        content_el = news_html.select_one("article#dic_area") or news_html.select_one("#articeBody")
+        content_text = content_el.get_text(" ", strip=True) if content_el else ""
 
-        try:
-            date_elem = news_html.select_one(
-                "div.media_end_head_info_datestamp > div > span"
-            )
+        news_date = None
+        date_elem = news_html.select_one("div.media_end_head_info_datestamp > div > span")
+        if date_elem and date_elem.has_attr("data-date-time"):
             news_date = date_elem["data-date-time"]
-        except:
+        if not news_date:
             news_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        articles.append((title, content, news_date, link))
+        articles.append((title, content_text, news_date, link))
 
     conn = get_conn()
     cur = conn.cursor()
@@ -74,7 +77,7 @@ def crawl_news():
             VALUES (%s, %s, %s, %s)
             ON CONFLICT (link) DO NOTHING
         """, (title, content, news_date, link))
-    conn.commit() # DB에 결과 저장
+    conn.commit()
     cur.close()
     conn.close()
 
@@ -82,23 +85,22 @@ def crawl_news():
 
 @router.get("/article")
 def get_news(limit: int = 50, offset: int = 0):
-    conn = get_conn() # DB 연결
-    cur = conn.cursor() # 커서 생성 -> 결과는 Result Set 형식으로 쌓임.
+    init_db()  
+
+    conn = get_conn()
+    cur = conn.cursor()
     cur.execute("""
         SELECT title, content, date, link
         FROM news
-        ORDER BY COALESCE(date, 'epoch'::timestamptz) DESC NULLS LAST
+        ORDER BY date DESC NULLS LAST 
         LIMIT %s OFFSET %s
     """, (limit, offset))
-    # cur.fetchone() : 결과 집합에서 맨 위의 한 행만 가져옴.
-    # cur.fetchmany(size) : 결과 집합에서 size 개수만큼 행 가져옴.
-    rows = cur.fetchall() # 결과 집합의 남아 있는 모든 행을 가져옴. (각 row는 튜플 형태)
+    rows = cur.fetchall()
     cur.close()
     conn.close()
 
     articles = []
     for title, content, dt, link in rows:
-        # ★ datetime/date → ISO 문자열로 변환
         if isinstance(dt, (datetime, date)):
             dt_str = dt.isoformat()
         else:
