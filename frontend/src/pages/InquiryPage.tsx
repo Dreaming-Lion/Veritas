@@ -20,7 +20,7 @@ const InquiryPage: React.FC = () => {
     <div className="min-h-screen bg-white overflow-x-hidden">
       <main
         className="w-screen min-h-screen bg-gradient-to-b from-white to-green-50 pt-12"
-        style={{ width: "calc(100vw - 32px)", paddingBottom: 0, margin: 0 }}
+        style={{ paddingBottom: 0, margin: 0 }}
       >
         <div className="mx-4 sm:mx-8 md:mx-12 lg:mx-16 xl:mx-24 2xl:mx-36 flex justify-center mb-0">
           <div

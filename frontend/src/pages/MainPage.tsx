@@ -18,10 +18,11 @@ type ArticleEx = Article & {
   content?: string | null;
 };
 
+const PAGE_SIZE = 18;
+
 const idFromLink = (link: string) =>
   Array.from(link).reduce((acc, ch) => (acc * 33 + ch.charCodeAt(0)) >>> 0, 5381);
 
-// VITE_API_BASE가 있으면 절대경로, 없으면 /api 프록시 사용
 const apiUrl = (path: string) => {
   const base = import.meta.env.VITE_API_BASE as string | undefined;
   return base ? `${base}${path}` : `/api${path}`;
@@ -54,7 +55,7 @@ const Card: React.FC<{ item: ArticleEx }> = ({ item }) => {
   return (
     <Link
       to={`/Detail/${item.id}`}
-      state={{ item }} // 상세에서 사용
+      state={{ item }} 
       className="group w-full text-left !bg-white rounded-xl shadow-sm transition hover:shadow-lg
                  hover:-translate-y-0.5 p-4 h-full flex flex-col !border-l-4 !border-green-500"
     >
@@ -84,10 +85,14 @@ const Card: React.FC<{ item: ArticleEx }> = ({ item }) => {
 };
 
 const MainPage: React.FC = () => {
-  const [allItems, setAllItems] = React.useState<ArticleEx[]>([]);
-  const [items, setItems] = React.useState<ArticleEx[]>([]);
+  const [allItems, setAllItems] = React.useState<ArticleEx[]>([]); // 로드된 전체 버퍼
+  const [items, setItems] = React.useState<ArticleEx[]>([]);       // 검색 필터 적용된 목록
+  const [visibleCount, setVisibleCount] = React.useState<number>(PAGE_SIZE); // 화면에 노출 개수
   const [loading, setLoading] = React.useState(false);
+  const [loadingMore, setLoadingMore] = React.useState(false);
   const [query, setQuery] = React.useState("");
+  const [nextOffset, setNextOffset] = React.useState(0);  // 다음 fetch offset
+  const [serverHasMore, setServerHasMore] = React.useState(true); // 서버에 더 있는지 추정
 
   const mapArticles = (list: ApiArticle[]): ArticleEx[] => {
     const toExcerpt = (a: ApiArticle) => {
@@ -101,44 +106,104 @@ const MainPage: React.FC = () => {
       time: a.date ?? "",
       press: "네이버 뉴스",
       link: a.link,
-      content: a.content ?? null, // 상세에서 사용
+      content: a.content ?? null,
     }));
   };
 
-  const loadArticles = React.useCallback(async () => {
-    setLoading(true);
-    const ac = new AbortController();
-    try {
-      const res = await fetch(apiUrl("/article?limit=50&offset=0"), {
-        headers: { Accept: "application/json" },
-        signal: ac.signal,
-      });
-      if (!res.ok) throw new Error(`GET /article 실패 (status ${res.status})`);
-      const j: BackendListResponse = await res.json();
-      const mapped = mapArticles(j.articles ?? []);
-      setAllItems(mapped);
-      setItems(mapped);
-    } catch (e) {
-      console.error(e);
-      setAllItems([]);
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-    return () => ac.abort();
+  // 특정 페이지를 서버에서 가져오기
+  const fetchPage = React.useCallback(async (offset: number) => {
+    const res = await fetch(apiUrl(`/article?limit=${PAGE_SIZE}&offset=${offset}`), {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) throw new Error(`GET /article 실패 (status ${res.status})`);
+    const j: BackendListResponse = await res.json();
+    const mapped = mapArticles(j.articles ?? []);
+    setServerHasMore(mapped.length === PAGE_SIZE);
+    return mapped;
   }, []);
 
-  React.useEffect(() => { loadArticles(); }, [loadArticles]);
-
   React.useEffect(() => {
-    if (!query.trim()) { setItems(allItems); return; }
+    const run = async () => {
+      setLoading(true);
+      try {
+        const first = await fetchPage(0);
+        setAllItems(first);
+        setNextOffset(first.length); 
+        setVisibleCount(Math.min(PAGE_SIZE, first.length));
+        setItems(first);
+      } catch (e) {
+        console.error(e);
+        setAllItems([]);
+        setItems([]);
+        setVisibleCount(0);
+        setServerHasMore(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+    run();
+  }, [fetchPage]);
+
+  // 검색 적용
+  React.useEffect(() => {
+    if (!query.trim()) {
+      setItems(allItems);
+      setVisibleCount(Math.min(PAGE_SIZE, allItems.length));
+      return;
+    }
     const q = query.trim().toLowerCase();
-    setItems(allItems.filter(
-      (it) => it.title.toLowerCase().includes(q) || it.excerpt.toLowerCase().includes(q)
-    ));
+    const filtered = allItems.filter(
+      (it) =>
+        it.title.toLowerCase().includes(q) ||
+        it.excerpt.toLowerCase().includes(q)
+    );
+    setItems(filtered);
+    setVisibleCount(Math.min(PAGE_SIZE, filtered.length));
   }, [query, allItems]);
 
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); };
+  const handleLoadMore = async () => {
+    if (visibleCount < items.length) {
+      setVisibleCount((v) => Math.min(v + PAGE_SIZE, items.length));
+      return;
+    }
+
+    if (!serverHasMore) return;
+
+    try {
+      setLoadingMore(true);
+      const next = await fetchPage(nextOffset);
+      if (next.length > 0) {
+        const merged = [...allItems, ...next];
+        setAllItems(merged);
+
+        const q = query.trim().toLowerCase();
+        const afterFilter = q
+          ? merged.filter(
+              (it) =>
+                it.title.toLowerCase().includes(q) ||
+                it.excerpt.toLowerCase().includes(q)
+            )
+          : merged;
+
+        setItems(afterFilter);
+        setVisibleCount((v) => Math.min(v + PAGE_SIZE, afterFilter.length));
+        setNextOffset(nextOffset + next.length);
+      } else {
+        setServerHasMore(false);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+  };
+
+  const canShowMore =
+    visibleCount < items.length || serverHasMore; 
 
   return (
     <div className="w-screen px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30" style={{ width: "calc(100vw - 32px)" }}>
@@ -180,9 +245,25 @@ const MainPage: React.FC = () => {
       {loading ? (
         <div className="text-sm text-gray-500">불러오는 중…</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-          {items.map((a) => (<Card key={a.id} item={a} />))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+            {items.slice(0, visibleCount).map((a) => (<Card key={a.id} item={a} />))}
+          </div>
+
+          {canShowMore && (
+            <div className="flex justify-center mt-8">
+              <button
+                type="button"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="px-6 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium
+                           disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {loadingMore ? "불러오는 중…" : "더보기"}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
