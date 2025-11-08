@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from app.api.crawl import crawl_news, router as crawl_router
 from app.api.opposite import router as recommend_router
 from app.api.rss_crawl import crawl_rss, router as rss_router
-from app.api.article import router as article_router
+from app.api.crawl import router as article_router
 # apscheduler는 파이썬에서 일정 관리를 위해 활용하는 라이브러리 !
 # 여기서는 주기적으로 뉴스 기사 크롤링 함수를 실행해 DB에 저장하기 위해 활용함.
 from apscheduler.schedulers.background import BackgroundScheduler
