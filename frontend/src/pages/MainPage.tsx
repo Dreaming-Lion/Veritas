@@ -1,9 +1,10 @@
-// MainPage.tsx
+// src/pages/MainPage.tsx
 import React from "react";
 import { Link } from "react-router-dom";
 import useBookmarks, { type Article } from "../hook/useBookmarks";
 
 type ApiArticle = {
+  id: number;
   title: string;
   content?: string | null;
   summary?: string | null;
@@ -20,12 +21,35 @@ type ArticleEx = Article & {
 
 const PAGE_SIZE = 18;
 
-const idFromLink = (link: string) =>
-  Array.from(link).reduce((acc, ch) => (acc * 33 + ch.charCodeAt(0)) >>> 0, 5381);
-
 const apiUrl = (path: string) => {
   const base = import.meta.env.VITE_API_BASE as string | undefined;
   return base ? `${base}${path}` : `/api${path}`;
+};
+
+const decodeHTMLEntities = (s?: string | null): string => {
+  if (!s) return "";
+  let out = s;
+  for (let i = 0; i < 3; i++) {
+    const ta = document.createElement("textarea");
+    ta.innerHTML = out;
+    const next = ta.value;
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+};
+
+const cleanTitle = (t?: string | null): string => {
+  let s = decodeHTMLEntities(t);
+  s = s.replace(/[“”"]/g, "");       
+  s = s.replace(/\s+/g, " ").trim();
+  return s;
+};
+
+const toExcerpt = (raw?: string | null): string => {
+  const base = decodeHTMLEntities(raw).replace(/\s+/g, " ").trim();
+  if (!base) return "본문 미리보기가 없습니다.";
+  return base.length > 50 ? base.slice(0, 50) + "…" : base;
 };
 
 const BookmarkButton: React.FC<{ saved: boolean; onToggle: () => void }> = ({ saved, onToggle }) => (
@@ -54,8 +78,8 @@ const Card: React.FC<{ item: ArticleEx }> = ({ item }) => {
 
   return (
     <Link
-      to={`/Detail/${item.id}`}
-      state={{ item }} 
+      to={`/Detail/${item.id}`}   
+      state={{ item }}
       className="group w-full text-left !bg-white rounded-xl shadow-sm transition hover:shadow-lg
                  hover:-translate-y-0.5 p-4 h-full flex flex-col !border-l-4 !border-green-500"
     >
@@ -85,32 +109,27 @@ const Card: React.FC<{ item: ArticleEx }> = ({ item }) => {
 };
 
 const MainPage: React.FC = () => {
-  const [allItems, setAllItems] = React.useState<ArticleEx[]>([]); // 로드된 전체 버퍼
-  const [items, setItems] = React.useState<ArticleEx[]>([]);       // 검색 필터 적용된 목록
-  const [visibleCount, setVisibleCount] = React.useState<number>(PAGE_SIZE); // 화면에 노출 개수
+  const [allItems, setAllItems] = React.useState<ArticleEx[]>([]);
+  const [items, setItems] = React.useState<ArticleEx[]>([]);
+  const [visibleCount, setVisibleCount] = React.useState<number>(PAGE_SIZE);
   const [loading, setLoading] = React.useState(false);
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [query, setQuery] = React.useState("");
-  const [nextOffset, setNextOffset] = React.useState(0);  // 다음 fetch offset
-  const [serverHasMore, setServerHasMore] = React.useState(true); // 서버에 더 있는지 추정
+  const [nextOffset, setNextOffset] = React.useState(0);
+  const [serverHasMore, setServerHasMore] = React.useState(true);
 
   const mapArticles = (list: ApiArticle[]): ArticleEx[] => {
-    const toExcerpt = (a: ApiArticle) => {
-      const base = (a.summary ?? a.content ?? "").replace(/\s+/g, " ").trim();
-      return base.length > 50 ? base.slice(0, 50) + "…" : base || "본문 미리보기가 없습니다.";
-    };
     return list.map((a) => ({
-      id: idFromLink(a.link),
-      title: a.title,
-      excerpt: toExcerpt(a),
+      id: a.id, 
+      title: cleanTitle(a.title),
+      excerpt: toExcerpt(a.summary ?? a.content), 
       time: a.date ?? "",
       press: "네이버 뉴스",
-      link: a.link,
-      content: a.content ?? null,
+      link: (a.link || "").replace(/&amp;/g, "&"),
+      content: a.content ? decodeHTMLEntities(a.content) : null, 
     }));
   };
 
-  // 특정 페이지를 서버에서 가져오기
   const fetchPage = React.useCallback(async (offset: number) => {
     const res = await fetch(apiUrl(`/article?limit=${PAGE_SIZE}&offset=${offset}`), {
       headers: { Accept: "application/json" },
@@ -128,7 +147,7 @@ const MainPage: React.FC = () => {
       try {
         const first = await fetchPage(0);
         setAllItems(first);
-        setNextOffset(first.length); 
+        setNextOffset(first.length);
         setVisibleCount(Math.min(PAGE_SIZE, first.length));
         setItems(first);
       } catch (e) {
@@ -144,7 +163,6 @@ const MainPage: React.FC = () => {
     run();
   }, [fetchPage]);
 
-  // 검색 적용
   React.useEffect(() => {
     if (!query.trim()) {
       setItems(allItems);
@@ -166,7 +184,6 @@ const MainPage: React.FC = () => {
       setVisibleCount((v) => Math.min(v + PAGE_SIZE, items.length));
       return;
     }
-
     if (!serverHasMore) return;
 
     try {
@@ -202,8 +219,7 @@ const MainPage: React.FC = () => {
     e.preventDefault();
   };
 
-  const canShowMore =
-    visibleCount < items.length || serverHasMore; 
+  const canShowMore = visibleCount < items.length || serverHasMore;
 
   return (
     <div className="w-screen px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30" style={{ width: "calc(100vw - 32px)" }}>
