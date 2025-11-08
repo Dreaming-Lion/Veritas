@@ -203,7 +203,7 @@ def get_news(limit: int = 50, offset: int = 0):
     return {"count": len(arts), "articles": arts}
 
 
-@router.get("/article/{article_id}")
+@router.get("/article/{article_id:int}")
 def get_article(article_id: int):
     init_db()
     conn = get_conn(); cur = conn.cursor()
@@ -264,6 +264,6 @@ def get_article_by_link(link: str = Query(..., description="원문 링크(URL)")
 def get_article_meta_by_link(link: str = Query(...)):
     return {"claim": None, "opposing": None, "bill": None, "briefing": None}
 
-@router.get("/article/{article_id}/meta")
+@router.get("/article/{article_id:int}/meta")
 def get_article_meta_by_id(article_id: int):
     return {"claim": None, "opposing": None, "bill": None, "briefing": None}

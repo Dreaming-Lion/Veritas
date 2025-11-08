@@ -1,6 +1,6 @@
 // src/pages/ArticleDetailPage.tsx
 import React from "react";
-import { useLocation, useNavigate, useParams, Link } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 type ApiArticle = {
   id: number;
@@ -24,8 +24,21 @@ type MetaResponse = {
 
 type SummaryResponse = { summary: string };
 
+type RecItem = {
+  title: string;
+  link: string;
+  source?: string | null;
+  date?: string | null;
+  score?: number;
+};
+type RecResponse = {
+  clicked: string;
+  recommendations: RecItem[];
+};
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
+/* ------------------------ 텍스트 정리 유틸 ------------------------ */
 const decodeHTMLEntities = (s?: string | null): string => {
   if (!s) return "";
   let out = s;
@@ -42,10 +55,7 @@ const decodeHTMLEntities = (s?: string | null): string => {
 const formatArticleText = (raw?: string | null): string => {
   let t = decodeHTMLEntities(raw);
   t = t.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  t = t
-    .replace(/\\n/g, "\n")
-    .replace(/\\t/g, "  ")
-    .replace(/\u00a0/g, " ");
+  t = t.replace(/\\n/g, "\n").replace(/\\t/g, "  ").replace(/\u00a0/g, " ");
   t = t.replace(/\n{3,}/g, "\n\n");
   return t.trim();
 };
@@ -165,6 +175,10 @@ function isoToLocal(dt?: string | null) {
   }
 }
 
+type OppCard = { title: string; url: string; press: string; score: number; date?: string; summary?: string };
+
+const isAbortError = (e: any) => e?.name === "AbortError" || e?.code === 20;
+
 const ArticleDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { id: paramId } = useParams<{ id: string }>();
@@ -182,7 +196,7 @@ const ArticleDetailPage: React.FC = () => {
   const [err, setErr] = React.useState<string | null>(null);
 
   const [claim, setClaim] = React.useState<KeyClaim | null>(null);
-  const [opposing, setOpposing] = React.useState<OpposingNews | null>(null);
+  const [opposing, setOpposing] = React.useState<OpposingNews | null>(null); // 기존 메타 fallback
   const [bill, setBill] = React.useState<BillInfo | null>(null);
   const [briefing, setBriefing] = React.useState<BriefingInfo | null>(null);
 
@@ -190,6 +204,10 @@ const ArticleDetailPage: React.FC = () => {
   const [summary, setSummary] = React.useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = React.useState<boolean>(false);
   const [summaryErr, setSummaryErr] = React.useState<string | null>(null);
+
+  // 🔹 추천 뉴스 리스트 상태
+  const [oppList, setOppList] = React.useState<OppCard[]>([]);
+  const [oppLoading, setOppLoading] = React.useState<boolean>(false);
 
   React.useEffect(() => {
     let mounted = true;
@@ -216,7 +234,9 @@ const ArticleDetailPage: React.FC = () => {
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [paramId, previewLink]);
 
   // 메타(반대/법안/브리핑) 로드
@@ -235,12 +255,16 @@ const ArticleDetailPage: React.FC = () => {
         if (json.opposing) setOpposing(json.opposing);
         if (json.bill) setBill(json.bill);
         if (json.briefing) setBriefing(json.briefing);
-      } catch { /* noop */ }
+      } catch {
+        /* noop */
+      }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [paramId, previewLink]);
 
-  // ✅ 핵심 주장 = 요약 API 연동
+  // 요약 API 연동
   React.useEffect(() => {
     let mounted = true;
     (async () => {
@@ -248,15 +272,11 @@ const ArticleDetailPage: React.FC = () => {
         setSummaryLoading(true);
         setSummaryErr(null);
 
-        // 1) id로 요약 시도
         let res = await fetch(`${API_BASE}/article/${paramId}/summary?strict=false`);
         if (!res.ok && previewLink) {
-          // 2) 실패 시 링크로 시도
           res = await fetch(`${API_BASE}/article/summary/by-link?link=${encodeURIComponent(previewLink)}&strict=false`);
         }
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json: SummaryResponse = await res.json();
         const s = formatArticleText(json?.summary ?? "").trim();
         if (!mounted) return;
@@ -264,27 +284,137 @@ const ArticleDetailPage: React.FC = () => {
         if (s) {
           setSummary(s);
         } else {
-          // 서버 요약이 비어있으면 클라에서 예비요약(앞 2문장)
-          const fallback = firstSentences(data?.content ?? "" , 2) || firstSentences(preview?.excerpt ?? "", 2);
+          const fallback = firstSentences(data?.content ?? "", 2) || firstSentences(preview?.excerpt ?? "", 2);
           setSummary(fallback || null);
         }
       } catch (e: any) {
         if (!mounted) return;
         setSummaryErr(e?.message ?? "summary load failed");
-        // 실패 시에도 예비요약 제공
-        const fallback = firstSentences(data?.content ?? "" , 2) || firstSentences(preview?.excerpt ?? "", 2);
+        const fallback = firstSentences(data?.content ?? "", 2) || firstSentences(preview?.excerpt ?? "", 2);
         setSummary(fallback || null);
       } finally {
         if (mounted) setSummaryLoading(false);
       }
     })();
-    return () => { mounted = false; };
-    // data?.content 변화도 고려(초기 로딩 후 예비요약 용)
+    return () => {
+      mounted = false;
+    };
   }, [paramId, previewLink, data?.content, preview?.excerpt]);
 
+  // 반대 의견 추천 API 연동
+  const originalUrl = (data?.link ?? preview?.link ?? "").replace(/&amp;/g, "&");
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+    let requestId = Date.now(); 
+
+    async function fetchJsonWithFallback(clicked: string): Promise<RecResponse | null> {
+      const qs = `clicked_link=${encodeURIComponent(clicked)}&hours_window=48&topk_return=8&nli_threshold=0.4`;
+
+      const endpoints = [
+        `${API_BASE}/article/recommend?${qs}`,
+        `${API_BASE}/recommend?${qs}`,
+        `${API_BASE}/rec/recommend?${qs}`,
+      ];
+
+      for (const url of endpoints) {
+        try {
+          const res = await fetch(url, { signal });
+          if (res.ok) {
+            return (await res.json()) as RecResponse;
+          }
+          console.debug("[recommend] tried:", url, "status:", res.status);
+        } catch (e: any) {
+          if (isAbortError(e)) {
+            return null;
+          }
+          console.debug("[recommend] error:", e);
+        }
+      }
+      return null;
+    }
+
+    async function run() {
+      setOppLoading(true);
+      setOppList([]);
+
+      const clicked = originalUrl || previewLink;
+      if (!clicked) {
+        setOppLoading(false);
+        return;
+      }
+
+      try {
+        const rid = requestId;
+        const r = await fetchJsonWithFallback(clicked);
+        if (signal.aborted || rid !== requestId) return;
+
+        if (!r || !Array.isArray(r.recommendations)) {
+          setOppList([]);
+          return;
+        }
+
+        let candidates = r.recommendations.filter((x: any) => (x?.score ?? 0) >= 0.1);
+        if (candidates.length === 0) candidates = r.recommendations;
+
+        const top3 = candidates
+          .slice() 
+          .sort((a: any, b: any) => (b.score ?? 0) - (a.score ?? 0))
+          .slice(0, 3);
+
+        const enriched = await Promise.all(
+          top3.map(async (it: any) => {
+            const url = (it.link || "").replace(/&amp;/g, "&");
+            let sum = "";
+            try {
+              const sres = await fetch(
+                `${API_BASE}/article/summary/by-link?link=${encodeURIComponent(url)}&strict=false`,
+                { signal }
+              );
+              if (sres.ok) {
+                const sj: SummaryResponse = await sres.json();
+                sum = firstSentences(sj?.summary ?? "", 2);
+              }
+            } catch (e: any) {
+              if (!isAbortError(e)) console.debug("[recommend] summary error:", e);
+            }
+
+            const press = it.source || hostToPress(url) || "언론사";
+            const s = Number(it.score ?? 0);
+            return {
+              title: cleanTitle(it.title),
+              url,
+              press,
+              date: it.date || undefined,
+              score: Number.isFinite(s) ? s : 0,
+              summary: sum,
+            } as OppCard;
+          })
+        );
+
+        if (!signal.aborted && rid === requestId) {
+          setOppList(enriched);
+        }
+      } catch (e: any) {
+        if (!isAbortError(e)) {
+          console.error("[recommend] run error:", e);
+          setOppList([]);
+        }
+      } finally {
+        if (!signal.aborted) setOppLoading(false);
+      }
+    }
+
+    run();
+    return () => {
+      controller.abort();
+      requestId = Date.now();
+    };
+  }, [originalUrl, previewLink, paramId]);
+
   const displayTitle = cleanTitle(data?.title ?? preview?.title ?? "제목 없음");
-  const displayDate  = data?.date ? isoToLocal(data.date) : preview?.time || "";
-  const originalUrl  = (data?.link ?? preview?.link ?? "").replace(/&amp;/g, "&");
+  const displayDate = data?.date ? isoToLocal(data.date) : preview?.time || "";
   const previewExcerpt = formatArticleText(preview?.excerpt ?? "");
   const content = formatArticleText(data?.content ?? "") || previewExcerpt;
 
@@ -336,32 +466,74 @@ const ArticleDetailPage: React.FC = () => {
                     요약이 아직 준비되지 않았습니다.
                   </div>
                 )}
-                {summaryErr && (
-                  <p className="mt-2 text-xs text-red-500">요약 로드 오류: {summaryErr}</p>
-                )}
+                {summaryErr && <p className="mt-2 text-xs text-red-500">요약 로드 오류: {summaryErr}</p>}
               </div>
             </Card>
 
-            {/* 반대 의견 뉴스 */}
+            {/* 반대 의견 뉴스 (추천 3건) */}
             <Card interactive>
               <SectionHeader icon={<span className="text-orange-600">{Icon.alert}</span>} title="반대 의견 뉴스" />
               <div className="p-4">
-                {opposing ? (
+                {oppLoading ? (
+                  <div className="space-y-2">
+                    <div className="h-16 bg-orange-50/60 border border-orange-100 rounded animate-pulse" />
+                    <div className="h-16 bg-orange-50/60 border border-orange-100 rounded animate-pulse" />
+                    <div className="h-16 bg-orange-50/60 border border-orange-100 rounded animate-pulse" />
+                  </div>
+                ) : oppList.length > 0 ? (
+                  <div className="space-y-3">
+                    {oppList.map((it, idx) => (
+                      <a
+                        key={idx}
+                        href={it.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block rounded-lg bg-orange-50/70 border border-orange-100 hover:bg-orange-50 transition"
+                      >
+                        <div className="px-4 py-3">
+                          <div className="flex items-center justify-between text-xs text-orange-700/70">
+                            <span>출처: {it.press}</span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-orange-200">
+                              점수 {it.score.toFixed(2)}
+                            </span>
+                          </div>
+                          <p className="mt-1 font-semibold text-orange-900">{it.title}</p>
+                          {it.summary && <p className="mt-1 text-sm text-orange-800/90">{it.summary}</p>}
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                ) : opposing ? (
+                  // 기존 메타 API가 제공하던 단일 반대 기사(백업)
                   <div className="rounded-lg bg-orange-50/70 border border-orange-100">
                     <div className="border-l-4 border-orange-300 px-4 py-3">
                       <p className="font-semibold text-orange-900">{opposing.title}</p>
                       <p className="mt-2 text-sm text-orange-800/90">{opposing.excerpt}</p>
                       <p className="mt-3 text-xs text-orange-700/70">출처: {opposing.press}</p>
                       {opposing.url && (
-                        <a href={opposing.url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-sm !text-orange-700 hover:underline focus:outline-none">
+                        <a
+                          href={opposing.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-3 inline-flex items-center gap-1 text-sm !text-orange-700 hover:underline focus:outline-none"
+                        >
                           자세히 보기
-                          <svg viewBox="0 0 24 24" className="w-4 h-4"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          <svg viewBox="0 0 24 24" className="w-4 h-4">
+                            <path
+                              d="M9 18l6-6-6-6"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              fill="none"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
                         </a>
                       )}
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-gray-600">연동 준비 중입니다.</div>
+                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-gray-600">추천 결과가 없습니다.</div>
                 )}
               </div>
             </Card>
@@ -374,13 +546,27 @@ const ArticleDetailPage: React.FC = () => {
                   <div className="rounded-lg bg-purple-50/60 border border-purple-100">
                     <div className="border-l-4 border-purple-400 px-4 py-3 space-y-3 text-purple-950/90">
                       <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div><div className="text-purple-700/80">법안명</div><div className="font-medium">{bill.name}</div></div>
-                        <div><div className="text-purple-700/80">법안번호</div><div className="font-medium">{bill.number}</div></div>
-                        <div><div className="text-purple-700/80">현재 상태</div><div className="font-medium">{bill.status}</div></div>
+                        <div>
+                          <div className="text-purple-700/80">법안명</div>
+                          <div className="font-medium">{bill.name}</div>
+                        </div>
+                        <div>
+                          <div className="text-purple-700/80">법안번호</div>
+                          <div className="font-medium">{bill.number}</div>
+                        </div>
+                        <div>
+                          <div className="text-purple-700/80">현재 상태</div>
+                          <div className="font-medium">{bill.status}</div>
+                        </div>
                       </div>
                       <div className="text-sm">{bill.brief}</div>
                       {bill.url && (
-                        <a href={bill.url} target="_blank" rel="noreferrer" className="block w-full text-center rounded-full bg-white border border-purple-200 py-2 text-sm !text-purple-700 hover:bg-purple-50 transition focus:outline-none">
+                        <a
+                          href={bill.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block w-full text-center rounded-full bg-white border border-purple-200 py-2 text-sm !text-purple-700 hover:bg-purple-50 transition focus:outline-none"
+                        >
                           관련 법안 자세히 보기
                         </a>
                       )}
@@ -399,14 +585,27 @@ const ArticleDetailPage: React.FC = () => {
                 {briefing ? (
                   <div className="rounded-lg bg-green-50/60 border border-green-100">
                     <div className="border-l-4 border-green-400 px-4 py-3 space-y-2 text-green-950/90">
-                      <div className="text-sm"><span className="text-green-700/80">부처</span><span className="ml-2 font-medium">{briefing.dept}</span></div>
-                      <div className="text-sm"><span className="text-green-700/80">일자</span><span className="ml-2 font-medium">{briefing.date}</span></div>
+                      <div className="text-sm">
+                        <span className="text-green-700/80">부처</span>
+                        <span className="ml-2 font-medium">{briefing.dept}</span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-green-700/80">일자</span>
+                        <span className="ml-2 font-medium">{briefing.date}</span>
+                      </div>
                       <div className="font-semibold">{briefing.title}</div>
                       <p className="text-sm">{briefing.summary}</p>
                       {briefing.url && (
-                        <a href={briefing.url} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-1 rounded-full bg-white border border-green-200 px-4 py-2 text-sm !text-green-700 hover:bg-green-50 transition focus:outline-none">
+                        <a
+                          href={briefing.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center gap-1 rounded-full bg-white border border-green-200 px-4 py-2 text-sm !text-green-700 hover:bg-green-50 transition focus:outline-none"
+                        >
                           브리핑 전문 보기
-                          <svg viewBox="0 0 24 24" className="w-4 h-4"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          <svg viewBox="0 0 24 24" className="w-4 h-4">
+                            <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
                         </a>
                       )}
                     </div>
@@ -424,17 +623,19 @@ const ArticleDetailPage: React.FC = () => {
               <SectionHeader
                 icon={Icon.doc}
                 title="뉴스 내용"
-                right={originalUrl ? (
-                  <a
-                    href={originalUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-sm !text-gray-700 hover:bg-gray-50 transition focus:outline-none"
-                  >
-                    {Icon.external}
-                    뉴스 원문보기
-                  </a>
-                ) : null}
+                right={
+                  originalUrl ? (
+                    <a
+                      href={originalUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-sm !text-gray-700 hover:bg-gray-50 transition focus:outline-none"
+                    >
+                      {Icon.external}
+                      뉴스 원문보기
+                    </a>
+                  ) : null
+                }
               />
               <div className="p-5">
                 {loading && !content ? (

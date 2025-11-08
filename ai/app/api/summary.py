@@ -372,7 +372,7 @@ def summary_health():
     }
 
 # ---- summary-only 조회 API ----
-@router.get("/article/{article_id}/summary")
+@router.get("/article/{article_id:int}/summary")
 def get_summary_by_id(
     article_id: int,
     strict: bool = Query(False, description="True면 summary 없을 때 404 반환")
