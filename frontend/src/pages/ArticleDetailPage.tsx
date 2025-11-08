@@ -22,10 +22,10 @@ type MetaResponse = {
   briefing?: BriefingInfo | null;
 };
 
+type SummaryResponse = { summary: string };
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
-/* ------------------------ 텍스트 정리 유틸 ------------------------ */
-// HTML 엔티티(&quot; &hellip; &amp;) 안전 디코드 (최대 3회)
 const decodeHTMLEntities = (s?: string | null): string => {
   if (!s) return "";
   let out = s;
@@ -39,30 +39,29 @@ const decodeHTMLEntities = (s?: string | null): string => {
   return out;
 };
 
-// 기사 본문 전용: 엔티티 디코드 + 역슬래시 개행을 실제 개행으로
 const formatArticleText = (raw?: string | null): string => {
   let t = decodeHTMLEntities(raw);
-
-  // \r\n, \r -> \n 정규화
   t = t.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-
-  // 문자 그대로의 \n, \t, \u00a0 처리
   t = t
-    .replace(/\\n/g, "\n")               // 백슬래시+n → 실제 줄바꿈
-    .replace(/\\t/g, "  ")               // 탭은 공백 두 칸 정도로
-    .replace(/\u00a0/g, " ");            // NBSP → 스페이스
-
-  // 과도한 연속 개행 줄이기(취향에 따라 조정)
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, "  ")
+    .replace(/\u00a0/g, " ");
   t = t.replace(/\n{3,}/g, "\n\n");
-
-  // 앞뒤 공백 정리
   return t.trim();
 };
 
-// 제목 전용: 엔티티 디코드 + 양쪽 스마트쿼트/더블쿼트 제거
 const cleanTitle = (t?: string | null) =>
   decodeHTMLEntities(t).replace(/[“”"]/g, "").replace(/\s+/g, " ").trim();
 
+const firstSentences = (text: string, max = 2) => {
+  const s = formatArticleText(text);
+  if (!s) return "";
+  const bits = s
+    .split(/(?<=[\.!?]|…|”|\"|다\.|요\.)\s+/g)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  return bits.slice(0, Math.max(1, max)).join(" ");
+};
 /* ----------------------------------------------------------------- */
 
 const Card: React.FC<React.PropsWithChildren<{ className?: string; interactive?: boolean }>> = ({
@@ -187,6 +186,11 @@ const ArticleDetailPage: React.FC = () => {
   const [bill, setBill] = React.useState<BillInfo | null>(null);
   const [briefing, setBriefing] = React.useState<BriefingInfo | null>(null);
 
+  // summary 전용 상태
+  const [summary, setSummary] = React.useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = React.useState<boolean>(false);
+  const [summaryErr, setSummaryErr] = React.useState<string | null>(null);
+
   React.useEffect(() => {
     let mounted = true;
     (async () => {
@@ -215,6 +219,7 @@ const ArticleDetailPage: React.FC = () => {
     return () => { mounted = false; };
   }, [paramId, previewLink]);
 
+  // 메타(반대/법안/브리핑) 로드
   React.useEffect(() => {
     let mounted = true;
     (async () => {
@@ -234,6 +239,48 @@ const ArticleDetailPage: React.FC = () => {
     })();
     return () => { mounted = false; };
   }, [paramId, previewLink]);
+
+  // ✅ 핵심 주장 = 요약 API 연동
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setSummaryLoading(true);
+        setSummaryErr(null);
+
+        // 1) id로 요약 시도
+        let res = await fetch(`${API_BASE}/article/${paramId}/summary?strict=false`);
+        if (!res.ok && previewLink) {
+          // 2) 실패 시 링크로 시도
+          res = await fetch(`${API_BASE}/article/summary/by-link?link=${encodeURIComponent(previewLink)}&strict=false`);
+        }
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const json: SummaryResponse = await res.json();
+        const s = formatArticleText(json?.summary ?? "").trim();
+        if (!mounted) return;
+
+        if (s) {
+          setSummary(s);
+        } else {
+          // 서버 요약이 비어있으면 클라에서 예비요약(앞 2문장)
+          const fallback = firstSentences(data?.content ?? "" , 2) || firstSentences(preview?.excerpt ?? "", 2);
+          setSummary(fallback || null);
+        }
+      } catch (e: any) {
+        if (!mounted) return;
+        setSummaryErr(e?.message ?? "summary load failed");
+        // 실패 시에도 예비요약 제공
+        const fallback = firstSentences(data?.content ?? "" , 2) || firstSentences(preview?.excerpt ?? "", 2);
+        setSummary(fallback || null);
+      } finally {
+        if (mounted) setSummaryLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+    // data?.content 변화도 고려(초기 로딩 후 예비요약 용)
+  }, [paramId, previewLink, data?.content, preview?.excerpt]);
 
   const displayTitle = cleanTitle(data?.title ?? preview?.title ?? "제목 없음");
   const displayDate  = data?.date ? isoToLocal(data.date) : preview?.time || "";
@@ -276,12 +323,21 @@ const ArticleDetailPage: React.FC = () => {
             <Card interactive>
               <SectionHeader icon={<span className="text-blue-600">{Icon.bookOpen}</span>} title="핵심 주장" />
               <div className="p-4">
-                {claim ? (
+                {summaryLoading ? (
+                  <div className="animate-pulse rounded-lg bg-blue-50/70 border border-blue-100 h-[64px]" />
+                ) : summary ? (
                   <div className="rounded-lg bg-blue-50/70 border border-blue-100">
-                    <div className="border-l-4 border-blue-300 px-4 py-3 text-blue-900/90">{claim.text}</div>
+                    <div className="border-l-4 border-blue-300 px-4 py-3 text-blue-900/90 whitespace-pre-wrap">
+                      {summary}
+                    </div>
                   </div>
                 ) : (
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-gray-600">연동 준비 중입니다.</div>
+                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-gray-600">
+                    요약이 아직 준비되지 않았습니다.
+                  </div>
+                )}
+                {summaryErr && (
+                  <p className="mt-2 text-xs text-red-500">요약 로드 오류: {summaryErr}</p>
                 )}
               </div>
             </Card>

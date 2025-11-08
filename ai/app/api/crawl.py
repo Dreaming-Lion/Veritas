@@ -20,6 +20,7 @@ def init_db():
             link TEXT UNIQUE
         )
     """)
+    cur.execute("ALTER TABLE news ADD COLUMN IF NOT EXISTS summary TEXT")
     conn.commit()
     cur.close()
     conn.close()
@@ -129,37 +130,51 @@ def crawl_news():
     res = requests.get(url, headers=UA, timeout=10)
     soup = BeautifulSoup(res.text, "html.parser")
 
-    articles = []
+    collected = [] 
     for item in soup.select("div.sa_text"):
         a = item.select_one("a.sa_text_title")
         if not a:
             continue
-
         title = clean_title(a.get_text(strip=True))
         link = normalize_url(a.get("href", ""))
 
-        # 본문 페이지
         news_res = requests.get(link, headers=UA, timeout=10)
         news_html = BeautifulSoup(news_res.text, "html.parser")
 
         content_text = extract_article_text(news_html)
         news_date = extract_date(news_html)
+        collected.append((title, content_text, news_date, link))
 
-        articles.append((title, content_text, news_date, link))
-
-    conn = get_conn()
-    cur = conn.cursor()
-    for title, content, news_date, link in articles:
+    conn = get_conn(); cur = conn.cursor()
+    inserted_ids = []
+    for title, content, news_date, link in collected:
         cur.execute("""
             INSERT INTO news (title, content, date, link)
             VALUES (%s, %s, %s, %s)
-            ON CONFLICT (link) DO NOTHING
+            ON CONFLICT (link) DO UPDATE
+              SET title = EXCLUDED.title,
+                  content = EXCLUDED.content,
+                  date = EXCLUDED.date
+            RETURNING id
         """, (title, content, news_date, link))
-    conn.commit()
-    cur.close()
-    conn.close()
+        row = cur.fetchone()
+        if row:
+            inserted_ids.append(row[0])
 
-    return {"count": len(articles), "articles": articles}
+    conn.commit(); cur.close(); conn.close()
+
+    try:
+        base = os.getenv("SELF_BASE", "http://localhost:8000") 
+        requests.post(
+            f"{base}/api/webhook/crawl-complete",
+            json={"ids": inserted_ids, "force": False},  
+            timeout=5,
+        )
+    except Exception as e:
+        print(f"[crawl] summary webhook call failed: {e}")
+
+    return {"count": len(collected), "ids": inserted_ids}
+
 
 # 기사 조회
 @router.get("/article")
@@ -167,7 +182,7 @@ def get_news(limit: int = 50, offset: int = 0):
     init_db()
     conn = get_conn(); cur = conn.cursor()
     cur.execute("""
-        SELECT id, title, content, date, link
+        SELECT id, title, content, summary, date, link
         FROM news
         ORDER BY date DESC NULLS LAST
         LIMIT %s OFFSET %s
@@ -175,23 +190,25 @@ def get_news(limit: int = 50, offset: int = 0):
     rows = cur.fetchall()
     cur.close(); conn.close()
 
-    articles = []
-    for _id, title, content, dt, link in rows:
-        articles.append({
+    arts = []
+    for _id, title, content, summary, dt, link in rows:
+        arts.append({
             "id": _id,
             "title": clean_title(title or ""),
-            "content": (content or ""),
+            "content": content or "",
+            "summary": summary or "",    
             "date": dt.isoformat() if dt else None,
             "link": link or "",
         })
-    return {"count": len(articles), "articles": articles}
+    return {"count": len(arts), "articles": arts}
+
 
 @router.get("/article/{article_id}")
 def get_article(article_id: int):
     init_db()
     conn = get_conn(); cur = conn.cursor()
     cur.execute("""
-        SELECT id, title, content, date, link
+        SELECT id, title, content, summary, date, link
         FROM news
         WHERE id = %s
         LIMIT 1
@@ -202,14 +219,16 @@ def get_article(article_id: int):
     if not row:
         raise HTTPException(status_code=404, detail="article not found")
 
-    _id, title, content, dt, link = row
+    _id, title, content, summary, dt, link = row
     return {
         "id": _id,
         "title": clean_title(title or ""),
-        "content": (content or ""),
+        "content": content or "",
+        "summary": summary or "",   
         "date": dt.isoformat() if isinstance(dt, (datetime, date)) else None,
         "link": link or "",
     }
+
 
 @router.get("/article/by-link")
 def get_article_by_link(link: str = Query(..., description="원문 링크(URL)")):

@@ -52,6 +52,42 @@ const toExcerpt = (raw?: string | null): string => {
   return base.length > 50 ? base.slice(0, 50) + "…" : base;
 };
 
+const formatRelativeKorean = (iso?: string | null): string => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+
+  const now = Date.now();
+  let diffMs = now - d.getTime();
+  if (diffMs < 0) diffMs = 0; 
+
+  const m = 60 * 1000;
+  const h = 60 * m;
+  const day = 24 * h;
+  const week = 7 * day;
+
+  if (diffMs < 30 * 1000) return "방금 전";
+  if (diffMs < m)        return `${Math.floor(diffMs / 1000)}초 전`;
+  if (diffMs < h)        return `${Math.floor(diffMs / m)}분 전`;
+  if (diffMs < day)      return `${Math.floor(diffMs / h)}시간 전`;
+  if (diffMs < week)     return `${Math.floor(diffMs / day)}일 전`;
+  if (diffMs < 30 * day) return `${Math.floor(diffMs / week)}주 전`;
+
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${yy}.${mm}.${dd} ${hhmm}`;
+};
+
+const useNowTick = (intervalMs = 60_000) => {
+  const [, setTick] = React.useState(0);
+  React.useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+};
+
 const BookmarkButton: React.FC<{ saved: boolean; onToggle: () => void }> = ({ saved, onToggle }) => (
   <button
     type="button"
@@ -76,6 +112,10 @@ const Card: React.FC<{ item: ArticleEx }> = ({ item }) => {
   const { isSaved, toggle } = useBookmarks();
   const saved = isSaved(item.id);
 
+  useNowTick();
+
+  const relative = formatRelativeKorean(item.time);
+
   return (
     <Link
       to={`/Detail/${item.id}`}   
@@ -84,7 +124,7 @@ const Card: React.FC<{ item: ArticleEx }> = ({ item }) => {
                  hover:-translate-y-0.5 p-4 h-full flex flex-col !border-l-4 !border-green-500"
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-gray-400">{item.time}</span>
+        <span className="text-xs text-gray-400">{relative}</span>
         <span onClick={(e) => e.preventDefault()}>
           <BookmarkButton saved={saved} onToggle={() => toggle(item)} />
         </span>
