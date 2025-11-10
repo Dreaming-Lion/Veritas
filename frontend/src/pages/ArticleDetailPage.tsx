@@ -40,16 +40,12 @@ type RecResponse = {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
-/* 추천 파라미터를 한곳에서 관리 */
+/* 추천 파라미터 */
 const RECO = {
   HOURS_WINDOW: 48,
   TOPK: 8,
   NLI_THRESHOLD: 0.1,
-  POLL_MS: 10000,
 };
-
-// ✅ 백엔드에 *_cached 라우트가 없으면 false로 두세요.
-const USE_CACHED_ENDPOINTS = false;
 
 /* ------------------------ 텍스트 정리 유틸 ------------------------ */
 const decodeHTMLEntities = (s?: string | null): string => {
@@ -118,7 +114,7 @@ const SectionHeader: React.FC<{ icon: React.ReactNode; title: string; right?: Re
   </div>
 );
 
-/* 아이콘 모음(필요한 곳에서만 사용) */
+/* 아이콘 모음 */
 const Icon = {
   back: (
     <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
@@ -159,17 +155,6 @@ const Icon = {
     <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none">
       <rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" strokeWidth="1.8" />
       <path d="M5 10a7 7 0 0 0 14 0M12 19v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  ),
-  refresh: (
-    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none">
-      <path d="M3 12a9 9 0 1 0 2.64-6.36L3 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M3 3v3h3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  ),
-  bolt: (
-    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none">
-      <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   ),
 };
@@ -225,8 +210,6 @@ const ArticleDetailPage: React.FC = () => {
   // 🔹 추천 뉴스 상태
   const [oppList, setOppList] = React.useState<OppCard[]>([]);
   const [oppLoading, setOppLoading] = React.useState<boolean>(false);
-  const [oppPending, setOppPending] = React.useState<boolean>(false); // 캐시 준비중 표시
-  const pollRef = React.useRef<number | null>(null);
 
   /* ---------------------- 기사 본문/메타/요약 ---------------------- */
   React.useEffect(() => {
@@ -319,7 +302,7 @@ const ArticleDetailPage: React.FC = () => {
     };
   }, [paramId, previewLink, data?.content, preview?.excerpt]);
 
-  /* ---------------------- 반대 의견 추천 ---------------------- */
+  /* ---------------------- 반대 의견 추천: 자동 라이브 조회 ---------------------- */
   const originalUrl = (data?.link ?? preview?.link ?? "").replace(/&amp;/g, "&");
 
   const clickedUrlMaybe = React.useMemo(() => {
@@ -327,127 +310,13 @@ const ArticleDetailPage: React.FC = () => {
     return u && u.length > 0 ? u : null;
   }, [originalUrl, previewLink]);
 
-  React.useEffect(() => {
-    const maybe = clickedUrlMaybe;
-    if (!maybe) return;
-
-    // ✅ 캐시 엔드포인트를 쓰지 않는 모드: 그냥 "준비중"만 띄움
-    if (!USE_CACHED_ENDPOINTS) {
-      setOppList([]);
-      setOppLoading(false);
-      setOppPending(true);
-      return;
-    }
-
-    let cancelled = false;
-
-    const buildQS = (urlStr: string, allowStale: boolean) =>
-      `clicked_link=${encodeURIComponent(urlStr)}&hours_window=${RECO.HOURS_WINDOW}&topk_return=${RECO.TOPK}&nli_threshold=${RECO.NLI_THRESHOLD}${
-        allowStale ? "&allow_stale=true" : ""
-      }`;
-
-    async function fetchCachedOnly(urlStr: string): Promise<RecResponse | null> {
-      const qs = buildQS(urlStr, false);
-      const endpoints = [
-        `${API_BASE}/article/recommend-cached?${qs}`,
-        `${API_BASE}/recommend-cached?${qs}`,
-        `${API_BASE}/rec/recommend-cached?${qs}`,
-      ];
-      for (const url of endpoints) {
-        try {
-          const r = await fetch(url);
-          if (r.status === 204) return null; // 캐시 없음 (깨끗하게 처리)
-          if (r.ok) return (await r.json()) as RecResponse;
-          // 404/501 등은 캐시 없음으로 취급
-        } catch {
-          /* ignore */
-        }
-      }
-      return null;
-    }
-
-    async function enrichTop(items: RecItem[], signal?: AbortSignal): Promise<OppCard[]> {
-      const top3 = (items || [])
-        .slice()
-        .filter((x: any) => (x?.score ?? 0) >= 0.1)
-        .sort((a: any, b: any) => (b.score ?? 0) - (a.score ?? 0))
-        .slice(0, 3);
-
-      const enriched = await Promise.all(
-        top3.map(async (it) => {
-          const url = (it.link || "").replace(/&amp;/g, "&");
-          let sum = "";
-          try {
-            const sres = await fetch(
-              `${API_BASE}/article/summary/by-link?link=${encodeURIComponent(url)}&strict=false`,
-              { signal }
-            );
-            if (sres.ok) {
-              const sj: SummaryResponse = await sres.json();
-              sum = firstSentences(sj?.summary ?? "", 2);
-            }
-          } catch {
-            /* ignore */
-          }
-          const press = it.source || hostToPress(url) || "언론사";
-          const s = Number(it.score ?? 0);
-          return {
-            title: cleanTitle(it.title),
-            url,
-            press,
-            date: it.date || undefined,
-            score: Number.isFinite(s) ? s : 0,
-            summary: sum,
-          } as OppCard;
-        })
-      );
-      return enriched;
-    }
-
-    async function run(urlStr: string) {
-      setOppLoading(true);
-      setOppPending(false);
-      setOppList([]);
-
-      const cached = await fetchCachedOnly(urlStr);
-      if (cancelled) return;
-
-      if (cached?.recommendations?.length) {
-        const controller = new AbortController();
-        const enriched = await enrichTop(cached.recommendations, controller.signal);
-        if (!cancelled) setOppList(enriched);
-        if (!cancelled) setOppLoading(false);
-        return;
-      }
-
-      if (!cancelled) {
-        setOppLoading(false);
-        setOppPending(true); // “준비중” 표시 (사용자 수동 트리거 유도)
-      }
-
-      // 필요하다면 여기서 폴링을 계속할 수도 있음. (생략)
-    }
-
-    run(maybe);
-
-    return () => {
-      if (pollRef.current) {
-        clearTimeout(pollRef.current as unknown as number);
-        pollRef.current = null;
-      }
-    };
-  }, [clickedUrlMaybe]);
-
-  // 수동 즉시 로드(라이브 계산)
-  const manualFetchLive = async () => {
-    const c = clickedUrlMaybe;
-    if (!c) return;
+  const manualFetchLive = React.useCallback(async () => {
+    if (!clickedUrlMaybe) return;
 
     setOppLoading(true);
-    setOppPending(false);
     setOppList([]);
 
-    const qs = `clicked_link=${encodeURIComponent(c)}&hours_window=${RECO.HOURS_WINDOW}&topk_return=${RECO.TOPK}&nli_threshold=${RECO.NLI_THRESHOLD}&allow_stale=true`;
+    const qs = `clicked_link=${encodeURIComponent(clickedUrlMaybe)}&hours_window=${RECO.HOURS_WINDOW}&topk_return=${RECO.TOPK}&nli_threshold=${RECO.NLI_THRESHOLD}&allow_stale=true`;
     const endpoints = [
       `${API_BASE}/article/recommend?${qs}`,
       `${API_BASE}/recommend?${qs}`,
@@ -470,7 +339,6 @@ const ArticleDetailPage: React.FC = () => {
     if (!r || !Array.isArray(r.recommendations)) {
       setOppLoading(false);
       setOppList([]);
-      setOppPending(true);
       return;
     }
 
@@ -512,7 +380,17 @@ const ArticleDetailPage: React.FC = () => {
 
     setOppList(enriched);
     setOppLoading(false);
-  };
+  }, [clickedUrlMaybe]);
+
+  // ✅ 페이지 진입/기사 전환 시 자동으로 라이브 추천 실행
+  React.useEffect(() => {
+    if (clickedUrlMaybe) {
+      manualFetchLive();
+    } else {
+      setOppList([]);
+      setOppLoading(false);
+    }
+  }, [clickedUrlMaybe, manualFetchLive]);
 
   /* ---------------------- 렌더 ---------------------- */
   const displayTitle = cleanTitle(data?.title ?? preview?.title ?? "제목 없음");
@@ -587,18 +465,6 @@ const ArticleDetailPage: React.FC = () => {
               <SectionHeader
                 icon={<span className="text-orange-600">{Icon.alert}</span>}
                 title="반대 의견 뉴스"
-                right={
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={manualFetchLive}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs !text-gray-700 hover:bg-gray-50 transition"
-                      title="지금 불러오기(캐시 미사용)"
-                    >
-                      {Icon.refresh}
-                      지금 불러오기
-                    </button>
-                  </div>
-                }
               />
               <div className="p-4">
                 {oppLoading ? (
@@ -630,12 +496,10 @@ const ArticleDetailPage: React.FC = () => {
                       </a>
                     ))}
                   </div>
-                ) : oppPending ? (
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-gray-600">
-                    추천을 준비 중입니다. “지금 불러오기”를 눌러 계산할 수 있어요.
-                  </div>
                 ) : (
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-gray-600">추천 결과가 없습니다.</div>
+                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-gray-600">
+                    추천 결과가 없습니다.
+                  </div>
                 )}
               </div>
             </Card>
