@@ -8,6 +8,7 @@ from app.api.crawl import router as article_router
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.model.model import load_model
 from fastapi.middleware.cors import CORSMiddleware
+from app.api.summary import router as summary_router, run_summary_after_crawl
 
 app = FastAPI(title="Veritas AI", version="0.1.0")
 
@@ -55,5 +56,6 @@ async def health_check():
 
 app.include_router(crawl_router, prefix="/api")
 app.include_router(rss_router, prefix="/api")
-app.include_router(recommend_router, prefix="/api") 
+app.include_router(recommend_router, prefix="/api")
+app.include_router(summary_router,  prefix="/api")
 app.include_router(article_router, prefix="/api")
