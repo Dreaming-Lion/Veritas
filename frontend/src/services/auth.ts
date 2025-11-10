@@ -1,30 +1,33 @@
-import { apiPOST } from "../lib/api";
+// frontend/src/services/auth.ts
+const API_BASE = "/api"; 
 
-export interface SignupPayload {
+export async function signup(payload: {
   name: string;
   email: string;
   password: string;
   password_confirm: string;
-}
-export interface LoginPayload {
-  email: string;
-  password: string;
-}
-export interface UserOut {
-  id: number;
-  nickname: string;
-  email: string;
-  created_at: string;
-}
-export interface TokenOut {
-  access_token: string;
-  token_type: string; // "bearer"
+}) {
+  const res = await fetch(`${API_BASE}/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || `signup failed (${res.status})`);
+  }
+  return res.json();
 }
 
-export async function signup(payload: SignupPayload) {
-  return apiPOST<UserOut>("/auth/signup", payload);
-}
-
-export async function login(payload: LoginPayload) {
-  return apiPOST<TokenOut>("/auth/login", payload);
+export async function login(payload: { email: string; password: string }) {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(msg || `login failed (${res.status})`);
+  }
+  return res.json();
 }

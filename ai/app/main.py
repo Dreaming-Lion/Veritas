@@ -9,6 +9,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from app.model.model import load_model
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.summary import router as summary_router, run_summary_after_crawl
+from app.db.databases import Base as AuthBase, engine as auth_engine
+from app.api.routes_auth import router as auth_router
 
 app = FastAPI(title="Veritas AI", version="0.1.0")
 
@@ -59,3 +61,4 @@ app.include_router(rss_router, prefix="/api")
 app.include_router(recommend_router, prefix="/api")
 app.include_router(summary_router,  prefix="/api")
 app.include_router(article_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")

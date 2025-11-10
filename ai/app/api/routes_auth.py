@@ -6,7 +6,7 @@ from app.repository.user_repo import get_user_by_email, create_user
 from app.schemas.auth import SignupIn, LoginIn, UserOut, TokenOut
 from app.utils.security import verify_password, create_access_token
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/signup", response_model=UserOut, status_code=201)
 def signup(payload: SignupIn, db: Session = Depends(get_db)):

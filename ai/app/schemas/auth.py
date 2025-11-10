@@ -42,5 +42,4 @@ class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
-# 선택: 명시적 export (오타/섀도잉 방지)
 __all__ = ["SignupIn", "LoginIn", "UserOut", "TokenOut"]
