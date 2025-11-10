@@ -9,7 +9,7 @@ import InquiryPage from "./pages/InquiryPage";
 import { AuthDialogProvider } from "./components/auth/AuthDialogProvider";
 import GuidePage from "./pages/GuidePage";
 import AboutPage from "./pages/AboutPage";
-import MyPage from "./pages/MyPage";
+import ListPage from "./pages/ListPage";
 
 const App: React.FC = () => {
   return (
@@ -22,7 +22,7 @@ const App: React.FC = () => {
           <Route path="/inquiry" element={<InquiryPage />} />
           <Route path="/guide" element={<GuidePage />} />
           <Route path="/about" element={<AboutPage />} />
-          <Route path="/mypage" element={<MyPage />} />
+          <Route path="/inquiry/list" element={<ListPage />} />
         </Routes>
       </Layout>
     </AuthDialogProvider>

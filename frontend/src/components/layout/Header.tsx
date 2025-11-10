@@ -1,3 +1,4 @@
+// src/components/Header.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuthDialog } from "../auth/AuthDialogProvider";
@@ -23,11 +24,9 @@ const Header: React.FC = () => {
 
   const { open: openAuth } = useAuthDialog();
 
-  // ✅ 인증 상태
   const [authed, setAuthed] = useState<boolean>(!!localStorage.getItem("access_token"));
   const [nickname, setNickname] = useState<string | null>(null);
 
-  // 토큰에서 닉네임 추출
   const refreshAuthFromStorage = () => {
     const token = localStorage.getItem("access_token");
     setAuthed(!!token);
@@ -62,13 +61,11 @@ const Header: React.FC = () => {
   const activeBookmarks = isStarts("/bookmarks");
   const activeGuide = isStarts("/guide");
   const activeAbout = isExact("/about");
-  const activeMyPage = isStarts("/mypage");
-  const activeInquiry = isStarts("/inquiry");
+  const activeInquiry = isExact("/inquiry");                 // 단건(작성/문의) 페이지
+  const activeInquiryList = isStarts("/inquiry/list");       // 리스트 페이지
 
-  // 공용 아이콘 클래스(크기 통일)
   const iconCls = "w-4 h-4 shrink-0";
 
-  // 데스크탑 nav pill
   const navPill = (active: boolean) =>
     [
       "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold transition border",
@@ -96,7 +93,7 @@ const Header: React.FC = () => {
     hoverTimer.current = window.setTimeout(() => setAboutOpen(false), 500);
   };
 
-  // ✅ 로그아웃
+  // 로그아웃
   const onLogout = () => {
     localStorage.removeItem("access_token");
     refreshAuthFromStorage();
@@ -157,7 +154,7 @@ const Header: React.FC = () => {
                 </Link>
               </li>
 
-              {/* About + MyPage + Inquiry */}
+              {/* About + Inquiry + Inquiry List */}
               <li
                 className="relative inline-block"
                 onMouseEnter={openNow}
@@ -174,24 +171,14 @@ const Header: React.FC = () => {
 
                 {aboutOpen && (
                   <div
-                    className="absolute left-0 top-full mt-2 z-10 min-w-full rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden divide-y divide-gray-200"
-                    onMouseEnter={openNow}
-                    onMouseLeave={closeWithDelay}
-                  >
-                    <Link
-                      to="/mypage"
-                      className={[
-                        "flex items-center gap-2 px-3 py-2 text-sm font-semibold transition",
-                        activeMyPage ? "bg-green-500 !text-white visited:!text-white" : "!text-gray-700 hover:bg-gray-50",
-                      ].join(" ")}
+                      className="absolute left-0 top-full mt-2 z-10
+                                min-w-[100px] w-max
+                                rounded-xl border border-gray-200 bg-white shadow-lg
+                                overflow-hidden divide-y divide-gray-200"
+                      onMouseEnter={openNow}
+                      onMouseLeave={closeWithDelay}
                     >
-                      <svg viewBox="0 0 24 24" className={iconCls} fill="none">
-                        <circle cx="12" cy="8.5" r="3" stroke="currentColor" strokeWidth="1.8" />
-                        <path d="M5 19.5a7 7 0 0 1 14 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                      </svg>
-                      MyPage
-                    </Link>
-
+                    {/* Inquiry (단건/작성) */}
                     <Link
                       to="/inquiry"
                       className={[
@@ -204,6 +191,20 @@ const Header: React.FC = () => {
                         <path d="M3.5 6l8.5 6 8.5-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                       Inquiry
+                    </Link>
+
+                    {/* Inquiry List */}
+                    <Link
+                      to="/inquiry/list"
+                      className={[
+                        "flex items-center gap-2 px-3 py-2 text-sm font-semibold transition",
+                        activeInquiryList ? "bg-green-500 !text-white visited:!text-white" : "!text-gray-700 hover:bg-gray-50",
+                      ].join(" ")}
+                    >
+                      <svg viewBox="0 0 24 24" className={iconCls} fill="none">
+                        <path d="M5 6h14M5 12h14M5 18h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                      </svg>
+                      Inquiry List
                     </Link>
                   </div>
                 )}
@@ -313,7 +314,7 @@ const Header: React.FC = () => {
             </Link>
           </li>
 
-          {/* About + MyPage + Inquiry (모바일/태블릿) */}
+          {/* About + Inquiry + Inquiry List (모바일/태블릿) */}
           <li className="space-y-2">
             <div className="relative">
               <Link to="/about" onClick={() => setOpen(false)} className={mobileCard(activeAbout)}>
@@ -333,17 +334,17 @@ const Header: React.FC = () => {
 
             {mAboutOpen && (
               <>
-                <Link to="/mypage" onClick={() => setOpen(false)} className={`ml-6 ${mobileCard(activeMyPage)}`}>
-                  MyPage
-                </Link>
                 <Link to="/inquiry" onClick={() => setOpen(false)} className={`ml-6 ${mobileCard(activeInquiry)}`}>
                   Inquiry
+                </Link>
+                <Link to="/inquiry/list" onClick={() => setOpen(false)} className={`ml-6 ${mobileCard(activeInquiryList)}`}>
+                  Inquiry List
                 </Link>
               </>
             )}
           </li>
 
-          {/* ✅ 모바일 인증 영역 */}
+          {/* 모바일 인증 영역 */}
           <li className="pt-2 flex gap-3">
             {!authed ? (
               <>

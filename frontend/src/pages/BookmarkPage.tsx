@@ -199,7 +199,7 @@ const BookmarkPage: React.FC = () => {
 
   return (
     <main
-      className="w-screen bg-white"
+      className="w-full bg-white"
       style={{ width: "calc(100vw - 32px)" }}
     >
       <div

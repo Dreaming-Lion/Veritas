@@ -19,8 +19,8 @@ const InquiryPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-white overflow-x-hidden">
       <main
-        className="w-screen min-h-screen bg-gradient-to-b from-white to-green-50 pt-12"
-        style={{ paddingBottom: 0, margin: 0 }}
+        className="w-full min-h-screen bg-gradient-to-b from-white to-green-50 pt-12"
+        style={{ paddingBottom: 0, margin: 0, width: "calc(100vw - 20px)" }}
       >
         <div className="mx-4 sm:mx-8 md:mx-12 lg:mx-16 xl:mx-24 2xl:mx-36 flex justify-center mb-0">
           <div
