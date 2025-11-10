@@ -2,6 +2,18 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuthDialog } from "../auth/AuthDialogProvider";
 
+/** JWT payload 디코더 (base64url → JSON) */
+function decodeJwt<T = any>(token: string): T | null {
+  try {
+    const [, payload] = token.split(".");
+    if (!payload) return null;
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(decodeURIComponent(escape(json)));
+  } catch {
+    return null;
+  }
+}
+
 const Header: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -10,6 +22,31 @@ const Header: React.FC = () => {
   const { pathname } = useLocation();
 
   const { open: openAuth } = useAuthDialog();
+
+  // ✅ 인증 상태
+  const [authed, setAuthed] = useState<boolean>(!!localStorage.getItem("access_token"));
+  const [nickname, setNickname] = useState<string | null>(null);
+
+  // 토큰에서 닉네임 추출
+  const refreshAuthFromStorage = () => {
+    const token = localStorage.getItem("access_token");
+    setAuthed(!!token);
+    if (token) {
+      const payload = decodeJwt<{ nickname?: string }>(token);
+      setNickname(payload?.nickname ?? null);
+    } else {
+      setNickname(null);
+    }
+  };
+
+  useEffect(() => {
+    refreshAuthFromStorage();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "access_token") refreshAuthFromStorage();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   useEffect(() => {
     setAboutOpen(false);
@@ -57,6 +94,12 @@ const Header: React.FC = () => {
   const closeWithDelay = () => {
     if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
     hoverTimer.current = window.setTimeout(() => setAboutOpen(false), 500);
+  };
+
+  // ✅ 로그아웃
+  const onLogout = () => {
+    localStorage.removeItem("access_token");
+    refreshAuthFromStorage();
   };
 
   return (
@@ -168,38 +211,65 @@ const Header: React.FC = () => {
             </ul>
           </nav>
 
-          {/* 우측: 로그인/회원가입 + 햄버거 */}
+          {/* 우측: 인증 영역 + 햄버거 */}
           <div className="flex items-center gap-3 md:justify-end justify-end md:col-start-3">
             <div className="hidden lg:flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => openAuth("login")}
-                className="inline-flex items-center gap-2 !bg-white px-3 py-1.5 rounded
-                           !text-gray-600 hover:text-green-600 transition hover:!border-0"
-              >
-                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-                  <path d="M5 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5"
-                    stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M12 12h8M16 8l4 4-4 4"
-                    stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                로그인
-              </button>
+              {!authed ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => openAuth("login")}
+                    className="inline-flex items-center gap-2 !bg-white px-3 py-1.5 rounded
+                               !text-gray-600 hover:text-green-600 transition hover:!border-0"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+                      <path d="M5 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5"
+                        stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M12 12h8M16 8l4 4-4 4"
+                        stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    로그인
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => openAuth("signup")}
-                className="inline-flex items-center gap-2 rounded-full border !border-green-500 bg-white
-                           !text-green-600 px-4 py-1.5 hover:!bg-green-50 transition hover:!border-green-500"
-              >
-                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-                  <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"
-                    stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M4 20a8 8 0 1 1 16 0"
-                    stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                회원가입
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => openAuth("signup")}
+                    className="inline-flex items-center gap-2 rounded-full border !border-green-500 bg-white
+                               !text-green-600 px-4 py-1.5 hover:!bg-green-50 transition hover:!border-green-500"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+                      <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"
+                        stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M4 20a8 8 0 1 1 16 0"
+                        stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    회원가입
+                  </button>
+                </>
+              ) : (
+                <>
+                  {/* 환영 배지 */}
+                  <div className="px-3 py-1.5 rounded-full border border-gray-200 text-sm text-gray-700 bg-white">
+                    {nickname ? `${nickname}님 환영해요` : "로그인됨"}
+                  </div>
+                  {/* 로그아웃 */}
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                      className="inline-flex items-center gap-2 rounded-full
+                                  border !border-green-500 !bg-green-500 !text-white
+                                  px-4 py-1.5 hover:bg-green-600 transition"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+                      <path d="M5 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5"
+                        stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M12 12h8M16 8l4 4-4 4"
+                        stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    로그아웃
+                  </button>
+                </>
+              )}
             </div>
 
             {/* 햄버거: 모바일+태블릿에서 표시 */}
@@ -273,24 +343,44 @@ const Header: React.FC = () => {
             )}
           </li>
 
+          {/* ✅ 모바일 인증 영역 */}
           <li className="pt-2 flex gap-3">
-            <button
-              type="button"
-              onClick={() => { openAuth("login"); setOpen(false); }}
-              className="flex-1 inline-flex justify-center items-center gap-2 bg-white px-3 py-2 rounded
-                         !text-gray-600 hover:text-green-600 transition"
-            >
-              로그인
-            </button>
+            {!authed ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => { openAuth("login"); setOpen(false); }}
+                  className="flex-1 inline-flex justify-center items-center gap-2 bg-white px-3 py-2 rounded
+                             !text-gray-600 hover:text-green-600 transition"
+                >
+                  로그인
+                </button>
 
-            <button
-              type="button"
-              onClick={() => { openAuth("signup"); setOpen(false); }}
-              className="flex-1 inline-flex justify-center items-center gap-2 rounded-full border border-green-500 bg-white
-                         !text-green-600 px-3 py-2 hover:bg-green-50 transition"
-            >
-              회원가입
-            </button>
+                <button
+                  type="button"
+                  onClick={() => { openAuth("signup"); setOpen(false); }}
+                  className="flex-1 inline-flex justify-center items-center gap-2 rounded-full border border-green-500 bg-white
+                             !text-green-600 px-3 py-2 hover:bg-green-50 transition"
+                >
+                  회원가입
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex-1 inline-flex justify-center items-center gap-2 bg-white px-3 py-2 rounded border border-gray-200 text-gray-700">
+                  {nickname ? `${nickname}님 환영해요` : "로그인됨"}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { onLogout(); setOpen(false); }}
+                  className="flex-1 inline-flex justify-center items-center gap-2 rounded-full
+                            border border-green-500 !bg-green-500 !text-white
+                            px-3 py-2 hover:bg-green-600 transition"
+                >
+                  로그아웃
+                </button>
+              </>
+            )}
           </li>
         </ul>
       </div>
