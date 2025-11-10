@@ -1,16 +1,11 @@
-# -*- coding: utf-8 -*-
 import psycopg2
-import pandas as pd
 from datetime import timedelta
-from fastapi import APIRouter, Query
-from summa import summarizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
 from app.model.model import nli_infer
 from app.utils.url_normalize import normalize_clicked, strip_tracking_params, normalize_variant_urls
-from datetime import timedelta
-
-router = APIRouter()
+from summa import summarizer
 
 DBCFG = dict(host="Veritas-db", dbname="appdb", user="appuser", password="apppw")
 
@@ -29,39 +24,23 @@ def summarize_text(text: str, ratio=0.2, hard_cap=1200):
         pass
     return text[:hard_cap]
 
-@router.get("/article/recommend")
-def recommend_articles(
-    clicked_link: str = Query(..., description="사용자가 클릭한 기사 URL"),
-    hours_window: int = Query(48, ge=6, le=168),
-    topk_return: int = Query(8, ge=1, le=20),
-    nli_threshold: float = Query(0.40, ge=0.0, le=1.0)
-):
-    conn = get_conn(); cur = conn.cursor()
-
-    # 네이버/모바일/AMP/트래킹 정리
+def _fetch_base(cur, clicked_link: str):
     normalized = normalize_clicked(clicked_link)
-
-    # 기준 기사 조회
     cur.execute("""
-        SELECT source, lean, title, COALESCE(content, summary, ''), date
+        SELECT source, lean, title, COALESCE(content, summary, ''), date, link
         FROM news WHERE link = %s;
     """, (normalized,))
     base = cur.fetchone()
     if not base and normalized != clicked_link:
         cur.execute("""
-            SELECT source, lean, title, COALESCE(content, summary, ''), date
+            SELECT source, lean, title, COALESCE(content, summary, ''), date, link
             FROM news WHERE link = %s;
         """, (clicked_link,))
         base = cur.fetchone()
+        normalized = clicked_link if base else normalized
+    return base, normalized
 
-    if not base:
-        cur.close(); conn.close()
-        return {"error": "해당 기사를 찾을 수 없습니다.", "normalized": normalized}
-
-    b_source, b_lean, b_title, b_text, b_date = base
-    premise = summarize_text(b_text or b_title, ratio=0.2)
-
-    # 후보 추출
+def _fetch_candidates(cur, b_lean, b_date, normalized, hours_window: int):
     if b_date:
         start_dt = b_date - timedelta(hours=hours_window)
         end_dt   = b_date + timedelta(hours=hours_window)
@@ -102,12 +81,27 @@ def recommend_articles(
                 ORDER BY date DESC
                 LIMIT 1200;
             """, (b_lean, normalized))
+    return cur.fetchall()
 
-    rows = cur.fetchall()
-    cur.close(); conn.close()
+def compute_recommendations(clicked_link: str,
+                            hours_window: int = 48,
+                            topk_return: int = 8,
+                            stance_threshold: float = 0.15):
+    conn = get_conn(); cur = conn.cursor()
+    try:
+        base, normalized = _fetch_base(cur, clicked_link)
+        if not base:
+            return {"error": "해당 기사를 찾을 수 없습니다.", "normalized": normalize_clicked(clicked_link)}
+
+        b_source, b_lean, b_title, b_text, b_date, b_link = base
+        premise = summarize_text(b_text or b_title, ratio=0.2) or (b_title or "")
+
+        rows = _fetch_candidates(cur, b_lean, b_date, normalize_clicked(b_link), hours_window)
+    finally:
+        cur.close(); conn.close()
 
     if not rows:
-        return {"clicked": normalized, "recommendations": []}
+        return {"clicked": normalize_clicked(b_link), "recommendations": []}
 
     titles = [r[0] for r in rows]
     texts  = [r[1] for r in rows]
@@ -116,7 +110,7 @@ def recommend_articles(
     leans  = [r[4] for r in rows]
     dates  = [r[5] for r in rows]
 
-    # 1차 : TF-IDF 유사도 Top-50
+    # TF-IDF 상위 후보
     docs = [(t or "") + " " + ((x or "")[:1500]) for t, x in zip(titles, texts)]
     tfidf = TfidfVectorizer(min_df=2, ngram_range=(1, 2))
     try:
@@ -127,20 +121,40 @@ def recommend_articles(
     K = min(50, len(docs))
     cand_idx = sorted(range(len(docs)), key=lambda i: sims[i], reverse=True)[:K]
 
-    # 2차 : NLI로 '반대'만 통과 + 점수화
     picks = []
     for i in cand_idx:
-        hyp = summarize_text(texts[i] or titles[i], ratio=0.2)
-        label, probs = nli_infer(premise, hyp)
-        cprob = probs[2]  # contradiction
-        if label == "contradiction" and cprob >= nli_threshold:
-            score = float(sims[i]) * (0.8 + 0.2 * cprob)
-            out_link = normalize_variant_urls(strip_tracking_params(links[i]))
-            picks.append(dict(
-                title=titles[i], link=out_link, source=srcs[i], lean=leans[i], date=dates[i],
-                probs={"entailment": probs[0], "neutral": probs[1], "contradiction": probs[2]},
-                score=score
-            ))
+        hyp = summarize_text(texts[i] or titles[i], ratio=0.2) or (titles[i] or "")
+        try:
+            label, probs = nli_infer(premise, hyp)
+        except Exception:
+            continue
+
+        eprob, nprob, cprob = float(probs[0]), float(probs[1]), float(probs[2])
+        stance = cprob - eprob  # [-1, 1]
+        if stance < stance_threshold:
+            continue
+
+        denom = max(1e-6, 1.0 - stance_threshold)
+        stance_norm = (stance - stance_threshold) / denom
+        stance_norm = 0.0 if stance_norm < 0 else (1.0 if stance_norm > 1 else stance_norm)
+
+        base_w, gain_w = 0.6, 0.4
+        score = float(sims[i]) * (base_w + gain_w * stance_norm)
+
+        out_link = normalize_variant_urls(strip_tracking_params(links[i]))
+        picks.append(dict(
+            title=titles[i],
+            link=out_link,
+            source=srcs[i],
+            lean=leans[i],
+            date=dates[i],
+            probs={"entailment": eprob, "neutral": nprob, "contradiction": cprob},
+            stance=stance,
+            score=score
+        ))
 
     picks.sort(key=lambda x: x["score"], reverse=True)
-    return {"clicked": normalized, "recommendations": picks[:topk_return]}
+    return {
+        "clicked": normalize_clicked(b_link),
+        "recommendations": picks[:topk_return]
+    }
