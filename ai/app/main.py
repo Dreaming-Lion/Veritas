@@ -13,6 +13,8 @@ from app.api.summary import router as summary_router, run_summary_after_crawl
 from app.services.recommend_batch import precompute_recent
 from app.model.model import load_model
 from app.api import article_reco, article_ready
+from app.db.databases import Base as AuthBase, engine as auth_engine
+from app.api.routes_auth import router as auth_router
 
 BOOTSTRAP_DO_CRAWL   = os.getenv("BOOTSTRAP_DO_CRAWL", "1") == "1"
 BOOTSTRAP_LOOKBACK_H = int(os.getenv("BOOTSTRAP_LOOKBACK_H", "720"))
@@ -132,3 +134,4 @@ app.include_router(article_router, prefix="/api")
 app.include_router(summary_router, prefix="/api")
 app.include_router(article_reco.router, prefix="/api")
 app.include_router(article_ready.router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
