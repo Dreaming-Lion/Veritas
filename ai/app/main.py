@@ -8,7 +8,6 @@ from app.api.crawl import router as article_router
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.model.model import load_model
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.summary import router as summary_router, run_summary_after_crawl
 
 app = FastAPI(title="Veritas AI", version="0.1.0")
 
@@ -34,6 +33,7 @@ def job_rss():
 
 def start_scheduler():
     scheduler = BackgroundScheduler()
+    AuthBase.metadata.create_all(bind=auth_engine)
     scheduler.add_job(job_naver, "interval", minutes=60, id="naver_job", max_instances=1, coalesce=True)
     scheduler.add_job(job_rss, "interval", minutes=60, id="rss_job",   max_instances=1, coalesce=True)
     scheduler.start()
@@ -57,4 +57,3 @@ app.include_router(crawl_router, prefix="/api")
 app.include_router(rss_router, prefix="/api")
 app.include_router(recommend_router, prefix="/api") 
 app.include_router(article_router, prefix="/api")
-app.include_router(summary_router,  prefix="/api")
