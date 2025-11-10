@@ -299,7 +299,8 @@ const MainPage: React.FC = () => {
 
   return (
     <div
-      className="w-full px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30"
+      className="w-screen px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30"
+      style={{ width: "calc(100vw - 34px)" }}
     >
       <form onSubmit={handleSubmit} role="search" aria-label="뉴스 검색" className="mb-4">
         <div className="flex items-center gap-3">

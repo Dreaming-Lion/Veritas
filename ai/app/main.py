@@ -17,6 +17,7 @@ from app.db.databases import Base as AuthBase, engine as auth_engine
 from app.api.routes_auth import router as auth_router
 from app.db.init_db import init_db_2
 from app.api.bookmarks import router as bookmarks_router
+from app.api.inquiries import router as inquiries_router
 
 BOOTSTRAP_DO_CRAWL   = os.getenv("BOOTSTRAP_DO_CRAWL", "1") == "1"
 BOOTSTRAP_LOOKBACK_H = int(os.getenv("BOOTSTRAP_LOOKBACK_H", "720"))
@@ -139,3 +140,4 @@ app.include_router(article_reco.router, prefix="/api")
 app.include_router(article_ready.router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(bookmarks_router, prefix="/api")
+app.include_router(inquiries_router, prefix="/api")
