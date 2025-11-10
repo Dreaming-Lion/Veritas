@@ -15,6 +15,7 @@ from app.model.model import load_model
 from app.api import article_reco, article_ready
 from app.db.databases import Base as AuthBase, engine as auth_engine
 from app.api.routes_auth import router as auth_router
+from app.db.init_db import init_db_2
 
 BOOTSTRAP_DO_CRAWL   = os.getenv("BOOTSTRAP_DO_CRAWL", "1") == "1"
 BOOTSTRAP_LOOKBACK_H = int(os.getenv("BOOTSTRAP_LOOKBACK_H", "720"))
@@ -95,6 +96,7 @@ def bootstrap_heavy_jobs():
 async def lifespan(app: FastAPI):
     print("[startup] init_db & ensure_cache_table")
     init_db()
+    init_db_2()
     article_reco.ensure_cache_table()
 
     print("[startup] load_model")
