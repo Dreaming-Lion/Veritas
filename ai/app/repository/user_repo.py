@@ -16,3 +16,6 @@ def create_user(db: Session, nickname: str, email: str, password: str) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+def get_user_by_id(db: Session, user_id: int) -> User | None:
+    return db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()

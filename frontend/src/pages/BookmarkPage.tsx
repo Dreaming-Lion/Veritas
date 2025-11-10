@@ -1,6 +1,45 @@
+// src/pages/BookmarkPage.tsx
 import React from "react";
 import { Link } from "react-router-dom";
 import useBookmarks, { type Article } from "../hook/useBookmarks";
+
+/* ===== 상대시간 포맷(메인과 동일) ===== */
+const formatRelativeKorean = (iso?: string | null): string => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+
+  const now = Date.now();
+  let diffMs = now - d.getTime();
+  if (diffMs < 0) diffMs = 0;
+
+  const m = 60 * 1000;
+  const h = 60 * m;
+  const day = 24 * h;
+  const week = 7 * day;
+
+  if (diffMs < 30 * 1000) return "방금 전";
+  if (diffMs < m)        return `${Math.floor(diffMs / 1000)}초 전`;
+  if (diffMs < h)        return `${Math.floor(diffMs / m)}분 전`;
+  if (diffMs < day)      return `${Math.floor(diffMs / h)}시간 전`;
+  if (diffMs < week)     return `${Math.floor(diffMs / day)}일 전`;
+  if (diffMs < 30 * day) return `${Math.floor(diffMs / week)}주 전`;
+
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${yy}.${mm}.${dd} ${hhmm}`;
+};
+
+/* 1분마다 강제 리렌더 → 상대시간 갱신 */
+const useNowTick = (intervalMs = 60_000) => {
+  const [, setTick] = React.useState(0);
+  React.useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+};
 
 /* ===== 공용 북마크 버튼 ===== */
 const BookmarkButton: React.FC<{ saved: boolean; onToggle: () => void }> = ({
@@ -48,58 +87,68 @@ const BookmarkCard: React.FC<{
   item: Article;
   onToggle: (a: Article) => void;
   saved: boolean;
-}> = ({ item, onToggle, saved }) => (
-  <button
-    type="button"
-    className="
-      group w-full text-left !bg-white rounded-xl shadow-sm
-      transition duration-200 ease-out transform
-      hover:shadow-lg active:shadow-lg focus:shadow-lg
-      hover:-translate-y-0.5 active:-translate-y-0.5 focus:-translate-y-0.5
-      !border-l-4 !border-green-500 !outline-none !focus:outline-none !focus:ring-0
-      p-4 h-full flex flex-col
-    "
-    style={{ WebkitTapHighlightColor: "transparent" }}
-  >
-    {/* 헤더 */}
-    <div className="flex items-center justify-between mb-2">
-      <span className="text-xs text-gray-400">{item.time}</span>
-      <span className="-mr-5.5 transition group-hover:translate-x-0.5">
-        <BookmarkButton saved={saved} onToggle={() => onToggle(item)} />
-      </span>
-    </div>
+}> = ({ item, onToggle, saved }) => {
+  useNowTick();
+  const relative = formatRelativeKorean(item.time);
 
-    {/* 제목 */}
-    <h2
+  return (
+    <div
       className="
-        mb-2 font-semibold text-gray-800 group-hover:text-gray-900
-        leading-snug line-clamp-2
-        min-h-[2.75rem]
+        group w-full text-left !bg-white rounded-xl shadow-sm
+        transition duration-200 ease-out transform
+        hover:shadow-lg active:shadow-lg focus:shadow-lg
+        hover:-translate-y-0.5 active:-translate-y-0.5 focus:-translate-y-0.5
+        !border-l-4 !border-green-500 !outline-none !focus:outline-none !focus:ring-0
+        p-4 h-full flex flex-col
       "
+      style={{ WebkitTapHighlightColor: "transparent" }}
     >
-      {item.title}
-    </h2>
+      {/* 헤더 */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-gray-400">{relative}</span>
+        <span className="-mr-5.5 transition group-hover:translate-x-0.5">
+          <BookmarkButton saved={saved} onToggle={() => onToggle(item)} />
+        </span>
+      </div>
 
-    {/* 요약 */}
-    <p
-      className="
-        text-gray-600 text-sm leading-relaxed line-clamp-2
-        min-h-[3.25rem] mb-4
-      "
-    >
-      {item.excerpt}
-    </p>
+      {/* 제목 */}
+      <h2
+        className="
+          mb-2 font-semibold text-gray-800 group-hover:text-gray-900
+          leading-snug line-clamp-2
+          min-h-[2.75rem]
+        "
+      >
+        {item.title}
+      </h2>
 
-    <div className="mt-auto flex items-center justify-between text-sm pt-2">
-      <span className="!text-gray-500">{item.press}</span>
-      <span className="!text-green-600 font-semibold group-hover:translate-x-0.5 transition">
-        <Link to="/Detail" className="!text-green-600">
-          자세히 보기 →
-        </Link>
-      </span>
+      {/* 요약 */}
+      <p
+        className="
+          text-gray-600 text-sm leading-relaxed line-clamp-2
+          min-h-[3.25rem] mb-4
+        "
+      >
+        {item.excerpt}
+      </p>
+
+      <div className="mt-auto flex items-center justify-between text-sm pt-2">
+        <span className="!text-gray-500">{item.press}</span>
+        <span className="!text-green-600 font-semibold group-hover:translate-x-0.5 transition">
+          {/* ✅ 메인과 동일: 해당 기사로 이동 + state 전달 */}
+          <Link
+            to={`/Detail/${item.id}`}
+            state={{ item }}
+            className="!text-green-600"
+            aria-label="자세히 보기"
+          >
+            자세히 보기 →
+          </Link>
+        </span>
+      </div>
     </div>
-  </button>
-);
+  );
+};
 
 const EmptyCard: React.FC = () => (
   <div className="flex items-center justify-center h-[55vh] w-full">

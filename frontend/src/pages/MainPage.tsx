@@ -1,8 +1,9 @@
-// src/pages/MainPage.tsx
 import React from "react";
 import { Link } from "react-router-dom";
 import useBookmarks, { type Article } from "../hook/useBookmarks";
+import { useAuthDialog } from "../components/auth/AuthDialogProvider";
 
+// ------------ types ------------
 type ApiArticle = {
   id: number;
   title: string;
@@ -11,13 +12,8 @@ type ApiArticle = {
   date?: string | null;
   link: string;
 };
-
 type BackendListResponse = { count: number; articles: ApiArticle[] };
-
-type ArticleEx = Article & {
-  link: string;
-  content?: string | null;
-};
+type ArticleEx = Article & { link: string; content?: string | null };
 
 const PAGE_SIZE = 18;
 
@@ -26,6 +22,7 @@ const apiUrl = (path: string) => {
   return base ? `${base}${path}` : `/api${path}`;
 };
 
+// ------------ helpers ------------
 const decodeHTMLEntities = (s?: string | null): string => {
   if (!s) return "";
   let out = s;
@@ -41,7 +38,7 @@ const decodeHTMLEntities = (s?: string | null): string => {
 
 const cleanTitle = (t?: string | null): string => {
   let s = decodeHTMLEntities(t);
-  s = s.replace(/[“”"]/g, "");       
+  s = s.replace(/[“”"]/g, "");
   s = s.replace(/\s+/g, " ").trim();
   return s;
 };
@@ -59,7 +56,7 @@ const formatRelativeKorean = (iso?: string | null): string => {
 
   const now = Date.now();
   let diffMs = now - d.getTime();
-  if (diffMs < 0) diffMs = 0; 
+  if (diffMs < 0) diffMs = 0;
 
   const m = 60 * 1000;
   const h = 60 * m;
@@ -67,16 +64,18 @@ const formatRelativeKorean = (iso?: string | null): string => {
   const week = 7 * day;
 
   if (diffMs < 30 * 1000) return "방금 전";
-  if (diffMs < m)        return `${Math.floor(diffMs / 1000)}초 전`;
-  if (diffMs < h)        return `${Math.floor(diffMs / m)}분 전`;
-  if (diffMs < day)      return `${Math.floor(diffMs / h)}시간 전`;
-  if (diffMs < week)     return `${Math.floor(diffMs / day)}일 전`;
+  if (diffMs < m) return `${Math.floor(diffMs / 1000)}초 전`;
+  if (diffMs < h) return `${Math.floor(diffMs / m)}분 전`;
+  if (diffMs < day) return `${Math.floor(diffMs / h)}시간 전`;
+  if (diffMs < week) return `${Math.floor(diffMs / day)}일 전`;
   if (diffMs < 30 * day) return `${Math.floor(diffMs / week)}주 전`;
 
   const yy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
-  const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(
+    d.getMinutes()
+  ).padStart(2, "0")}`;
   return `${yy}.${mm}.${dd} ${hhmm}`;
 };
 
@@ -88,45 +87,63 @@ const useNowTick = (intervalMs = 60_000) => {
   }, [intervalMs]);
 };
 
-const BookmarkButton: React.FC<{ saved: boolean; onToggle: () => void }> = ({ saved, onToggle }) => (
+// ------------ UI ------------
+const BookmarkButton: React.FC<{ saved: boolean; onToggle: () => void }> = ({
+  saved,
+  onToggle,
+}) => (
   <button
     type="button"
     onMouseDown={(e) => e.preventDefault()}
     onFocus={(e) => (e.currentTarget as HTMLButtonElement).blur()}
-    onClick={() => { onToggle(); }}
+    onClick={() => {
+      onToggle();
+    }}
     className="p-1.5 rounded appearance-none !outline-none ring-0 !border-0 !bg-transparent"
     aria-label={saved ? "북마크 해제" : "북마크"}
     title={saved ? "북마크 해제" : "북마크"}
   >
     <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none">
-      <path d="M7 3h10a1 1 0 0 1 1 1v16l-6-3-6 3V4a1 1 0 0 1 1-1z"
-            stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-            className={saved ? "hidden" : "block text-gray-500"} />
-      <path d="M7 3h10a1 1 0 0 1 1 1v16l-6-3-6 3V4a1 1 0 0 1 1-1z"
-            className={saved ? "block fill-green-500 text-green-500" : "hidden"} />
+      <path
+        d="M7 3h10a1 1 0 0 1 1 1v16l-6-3-6 3V4a1 1 0 0 1 1-1z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={saved ? "hidden" : "block text-gray-500"}
+      />
+      <path
+        d="M7 3h10a1 1 0 0 1 1 1v16l-6-3-6 3V4a1 1 0 0 1 1-1z"
+        className={saved ? "block fill-green-500 text-green-500" : "hidden"}
+      />
     </svg>
   </button>
 );
 
-const Card: React.FC<{ item: ArticleEx }> = ({ item }) => {
-  const { isSaved, toggle } = useBookmarks();
-  const saved = isSaved(item.id);
-
+const Card: React.FC<{
+  item: ArticleEx;
+  saved: boolean;
+  onToggle: () => void;
+}> = ({ item, saved, onToggle }) => {
   useNowTick();
-
   const relative = formatRelativeKorean(item.time);
 
   return (
     <Link
-      to={`/Detail/${item.id}`}   
+      to={`/Detail/${item.id}`}
       state={{ item }}
       className="group w-full text-left !bg-white rounded-xl shadow-sm transition hover:shadow-lg
                  hover:-translate-y-0.5 p-4 h-full flex flex-col !border-l-4 !border-green-500"
     >
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs text-gray-400">{relative}</span>
-        <span onClick={(e) => e.preventDefault()}>
-          <BookmarkButton saved={saved} onToggle={() => toggle(item)} />
+        <span
+          onClick={(e) => {
+            e.preventDefault(); // 링크 이동 방지
+            onToggle();
+          }}
+        >
+          <BookmarkButton saved={saved} onToggle={onToggle} />
         </span>
       </div>
 
@@ -158,15 +175,19 @@ const MainPage: React.FC = () => {
   const [nextOffset, setNextOffset] = React.useState(0);
   const [serverHasMore, setServerHasMore] = React.useState(true);
 
+  // ✅ 북마크 훅: 페이지에서 한 번만 사용
+  const { isSaved, toggle } = useBookmarks();
+  const { open: openAuth } = useAuthDialog();
+
   const mapArticles = (list: ApiArticle[]): ArticleEx[] => {
     return list.map((a) => ({
-      id: a.id, 
+      id: a.id,
       title: cleanTitle(a.title),
-      excerpt: toExcerpt(a.summary ?? a.content), 
+      excerpt: toExcerpt(a.summary ?? a.content),
       time: a.date ?? "",
       press: "네이버 뉴스",
       link: (a.link || "").replace(/&amp;/g, "&"),
-      content: a.content ? decodeHTMLEntities(a.content) : null, 
+      content: a.content ? decodeHTMLEntities(a.content) : null,
     }));
   };
 
@@ -259,10 +280,28 @@ const MainPage: React.FC = () => {
     e.preventDefault();
   };
 
+  // ✅ 북마크 토글 핸들러: 비로그인 → 모달
+  const onToggleCard = async (a: ArticleEx) => {
+    if (!localStorage.getItem("access_token")) {
+      openAuth("login"); // 헤더와 동일한 모달
+      return;
+    }
+    try {
+      await toggle(a);
+    } catch (e: any) {
+      if (e?.code === "NEED_AUTH") openAuth("login");
+      // 그 외 에러는 콘솔
+      else console.error(e);
+    }
+  };
+
   const canShowMore = visibleCount < items.length || serverHasMore;
 
   return (
-    <div className="w-screen px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30" style={{ width: "calc(100vw - 32px)" }}>
+    <div
+      className="w-screen px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30"
+      style={{ width: "calc(100vw - 32px)" }}
+    >
       <form onSubmit={handleSubmit} role="search" aria-label="뉴스 검색" className="mb-4">
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
@@ -303,7 +342,14 @@ const MainPage: React.FC = () => {
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-            {items.slice(0, visibleCount).map((a) => (<Card key={a.id} item={a} />))}
+            {items.slice(0, visibleCount).map((a) => (
+              <Card
+                key={a.id}
+                item={a}
+                saved={isSaved(a.id)}
+                onToggle={() => onToggleCard(a)}
+              />
+            ))}
           </div>
 
           {canShowMore && (
