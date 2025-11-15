@@ -85,36 +85,36 @@ def extract_date(doc: BeautifulSoup) -> str:
         return t["datetime"]
     
     meta = doc.select_one('meta[property="og:regDate"]')
-    
     if meta and meta.has_attr("content"):
         return meta["content"]
+
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+
 def _clean_body_noise(text: str) -> str:
-    """본문에서 노이즈 문자/라인 정리"""
+    """
+    본문은 노이즈 제거하지 말고 '라인 정리'만:
+      - HTML 엔티티 해제
+      - 줄 단위 트리밍
+      - 연속 빈 줄 3줄 이상 → 2줄로 축소
+    """
     if not text:
         return ""
-    s = text
-
-    s = html_unescape(s)
-
-    s = s.replace("$", "")
+    s = html_unescape(text)
 
     lines = []
     for line in s.splitlines():
-        line_strip = line.strip()
-        if not line_strip:
-            lines.append("") 
-            continue
-
+        line_strip = line.rstrip()
         lines.append(line_strip)
 
     s = "\n".join(lines)
+
+    # 빈 줄이 3줄 이상 연속되면 2줄로 정리
     s = re.sub(r"\n{3,}", "\n\n", s)
 
-    s = re.sub(r"[ \t\u00A0]+", " ", s)
-
+    # 앞뒤 공백/개행만 정리
     return s.strip()
+
 
 def extract_article_text(doc: BeautifulSoup) -> str:
     root = (
