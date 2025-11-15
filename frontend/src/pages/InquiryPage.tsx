@@ -92,9 +92,8 @@ const InquiryPage: React.FC = () => {
   return (
     <div
       className="min-h-screen w-screen bg-gray-50 px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30"
-      style={{ width: "calc(100vw - 34px)" }} // ★ MainPage와 동일 – 오른쪽 여백 제거
+      style={{ width: "calc(100vw - 34px)" }}
     >
-      {/* 상단 배너 – About과 동일한 구조, 텍스트만 문의용 */}
       <header className="w-full bg-gradient-to-r from-green-600 to-emerald-500 text-white shadow-lg">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <div className="flex items-center gap-3">
@@ -134,10 +133,8 @@ const InquiryPage: React.FC = () => {
         </div>
       </header>
 
-      {/* About과 동일한 main 레이아웃 */}
       <main className="w-full flex justify-center px-4 py-8">
         <div className="w-full max-w-6xl">
-          {/* ★ 배너와 카드 사이 여백 확인용 mt-6 추가 */}
           <section className="mt-6 mb-10">
             <div className="bg-white border border-green-200 rounded-2xl shadow-md px-6 sm:px-8 py-6">
               <div className="mb-6">
