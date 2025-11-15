@@ -72,6 +72,7 @@ services:
       GOV_POLICY_NEWS_KEY: ${GOV_POLICY_NEWS_KEY}
       GOV_PRESS_RELEASE_KEY: ${GOV_PRESS_RELEASE_KEY}
       GOV_SPEECH_KEY: ${GOV_SPEECH_KEY}
+      NA_BILL_KEY: ${NA_BILL_KEY}
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8001/health || exit 1"]
       interval: 10s

@@ -47,3 +47,14 @@ class GovDoc(BaseModel):
     approve_datetime: datetime
     minister: str
     original_url: Optional[str] = None
+
+
+class BillDoc(BaseModel):
+    bill_id: str
+    bill_no: str
+    name: str
+    committee: Optional[str] = None
+    propose_datetime: datetime
+    status: Optional[str] = None
+    detail_link: Optional[str] = None
+    proposer: Optional[str] = None

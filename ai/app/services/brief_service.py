@@ -10,8 +10,12 @@ import xmltodict
 import psycopg2
 from psycopg2.extras import DictCursor
 
-from app.schemas.briefing import GovDoc, MetaResponse
+from app.schemas.briefing import GovDoc, MetaResponse, BriefingInfo, BillInfo
 from app.services.brief_matcher import pick_best_briefing
+
+from app.services.bill_service import fetch_bills_around
+from app.services.bill_matcher import pick_best_bill
+
 
 DBCFG = dict(
     host=os.getenv("DB_HOST", "Veritas-db"),
@@ -20,19 +24,17 @@ DBCFG = dict(
     password=os.getenv("POSTGRES_PASSWORD", "apppw"),
 )
 
+
 def get_conn():
     return psycopg2.connect(**DBCFG)
+
 
 GOV_POLICY_NEWS_KEY = os.getenv("GOV_POLICY_NEWS_KEY", "")
 GOV_PRESS_RELEASE_KEY = os.getenv("GOV_PRESS_RELEASE_KEY", "")
 GOV_SPEECH_KEY = os.getenv("GOV_SPEECH_KEY", "")
 
-POLICY_NEWS_URL = (
-    "http://apis.data.go.kr/1371000/policyNewsService/policyNewsList"
-)
-PRESS_RELEASE_URL = (
-    "http://apis.data.go.kr/1371000/pressReleaseService/pressReleaseList"
-)
+POLICY_NEWS_URL = "http://apis.data.go.kr/1371000/policyNewsService/policyNewsList"
+PRESS_RELEASE_URL = "http://apis.data.go.kr/1371000/pressReleaseService/pressReleaseList"
 SPEECH_URL = "http://apis.data.go.kr/1371000/speechService/speechList"
 
 
@@ -248,14 +250,15 @@ async def _build_meta_for_article_dict(
 ) -> MetaResponse:
     """
     dict 형태의 기사 정보(id, title, body, date, link)를 받아
-    - 정부 문서 후보 조회
-    - TF-IDF 매칭
+    - 정부 문서(정책뉴스/보도자료/연설문) 후보 조회 + TF-IDF 매칭 -> briefing
+    - 국회의원 발의 법률안 후보 조회 + TF-IDF 매칭 -> bill
     - MetaResponse 생성
     """
     title = (article.get("title") or "").strip()
     body = (article.get("body") or "").strip()
     date_val = article.get("date")
 
+    # 기사 날짜를 tz-aware로 정규화 (기본 KST)
     if isinstance(date_val, datetime):
         if date_val.tzinfo is None:
             base_dt = date_val.replace(tzinfo=timezone(timedelta(hours=9)))
@@ -264,9 +267,10 @@ async def _build_meta_for_article_dict(
     else:
         base_dt = datetime.now(timezone.utc)
 
+    # 브리핑(정책뉴스/보도자료/연설문) 
     gov_docs = await fetch_all_gov_docs_around(base_dt)
 
-    briefing = None
+    briefing: Optional[BriefingInfo] = None
     if gov_docs:
         briefing = pick_best_briefing(
             article_title=title,
@@ -277,10 +281,30 @@ async def _build_meta_for_article_dict(
         )
         print(f"[brief] pick_best_briefing -> {bool(briefing)}")
 
+    # 국회의원 발의 법률안 
+    bill_info: Optional[BillInfo] = None
+    try:
+        bill_candidates = await fetch_bills_around(
+            article_dt=base_dt,
+            days_before=30,
+            days_after=7,
+        )
+        if bill_candidates:
+            bill_info = pick_best_bill(
+                article_title=title,
+                article_body=body,
+                article_date=base_dt,
+                candidates=bill_candidates,
+                min_sim=0.1,
+            )
+        print(f"[bill] candidates={len(bill_candidates)}, picked={bool(bill_info)}")
+    except Exception as e:
+        print("[bill] error while fetching/matching bills:", e)
+
     return MetaResponse(
         claim=None,
         opposing=None,
-        bill=None,
+        bill=bill_info,
         briefing=briefing,
     )
 

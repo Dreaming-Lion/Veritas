@@ -510,40 +510,53 @@ const ArticleDetailPage: React.FC = () => {
 
             {/* 관련 법안 */}
             <Card interactive>
-              <SectionHeader icon={<span className="!text-purple-600">{Icon.bill}</span>} title="관련 법안 정보" />
+              <SectionHeader icon={<span className="!text-purple-600">{Icon.bill}</span>} title="관련 발의 법안 정보" />
               <div className="p-4">
-                {bill ? (
-                  <div className="rounded-lg bg-purple-50/60 border border-purple-100">
-                    <div className="border-l-4 border-purple-400 px-4 py-3 space-y-3 text-purple-950/90">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <div className="text-purple-700/80">법안명</div>
-                          <div className="font-medium">{bill.name}</div>
+                {metaLoaded ? (
+                  bill ? (
+                    // bill 정보가 있을 때
+                    <div className="rounded-lg bg-purple-50/60 border border-purple-100">
+                      <div className="border-l-4 border-purple-400 px-4 py-3 space-y-3 text-purple-950/90">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <div className="text-purple-700/80">법안명</div>
+                            <div className="font-medium">{bill.name}</div>
+                          </div>
+                          <div>
+                            <div className="text-purple-700/80">법안번호</div>
+                            <div className="font-medium">{bill.number}</div>
+                          </div>
+                          <div>
+                            <div className="text-purple-700/80">현재 상태</div>
+                            <div className="font-medium">{bill.status}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-purple-700/80">법안번호</div>
-                          <div className="font-medium">{bill.number}</div>
-                        </div>
-                        <div>
-                          <div className="text-purple-700/80">현재 상태</div>
-                          <div className="font-medium">{bill.status}</div>
-                        </div>
+                        <div className="text-sm">{bill.brief}</div>
+                        {bill.url && (
+                          <a
+                            href={bill.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block w-full text-center rounded-full bg-white border border-purple-200 py-2 text-sm !text-purple-700 hover:bg-purple-50 transition focus:outline-none"
+                          >
+                            발의 법안 자세히 보기
+                          </a>
+                        )}
                       </div>
-                      <div className="text-sm">{bill.brief}</div>
-                      {bill.url && (
-                        <a
-                          href={bill.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block w-full text-center rounded-full bg-white border border-purple-200 py-2 text-sm !text-purple-700 hover:bg-purple-50 transition focus:outline-none"
-                        >
-                          관련 법안 자세히 보기
-                        </a>
-                      )}
                     </div>
-                  </div>
+                  ) : (
+                    // meta는 불러왔는데 bill이 없는 경우
+                    <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-gray-600">
+                      관련 발의 법안 정보가 없습니다.
+                      <br />
+                      이 기사는 국회 발의 법률안과 직접적으로 연계되지 않았을 수 있습니다.
+                    </div>
+                  )
                 ) : (
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-gray-600">연동 준비 중입니다.</div>
+                  // 아직 /meta 응답을 못 받은 상태
+                  <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-gray-600">
+                    발의 법안 정보를 불러오는 중입니다.
+                  </div>
                 )}
               </div>
             </Card>
@@ -592,7 +605,7 @@ const ArticleDetailPage: React.FC = () => {
                   ) : (
                     // 브리핑이 null인 경우
                     <div className="rounded-lg bg-gray-50 border border-green-100 px-4 py-3 text-gray-600">
-                      브리핑 정보가 없습니다. 이 기사는 정부 공식 브리핑과 직접적으로 연계되지 않았을 수 있습니다.
+                      브리핑 정보가 없습니다.<br />이 기사는 정부 공식 브리핑과 직접적으로 연계되지 않았을 수 있습니다.
                     </div>
                   )
                 ) : (

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Query
 from typing import List, Any, Optional
 from datetime import datetime
 import psycopg2
-from app.services.recommend_core import get_conn  # host=Veritas-db, db=appdb 등
+from app.services.recommend_core import get_conn 
 
 router = APIRouter()
 
