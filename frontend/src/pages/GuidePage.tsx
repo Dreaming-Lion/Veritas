@@ -458,7 +458,7 @@
                     <span className="text-lime-600">•</span>
                     <p className="text-sm">
                       <strong>게시판:</strong> 일반적인 질문은 About 게시판의
-                      &apos;Inquiry&apos; 카테고리를 이용해주세요!
+                      &apos;Inquiry&apos; 카테고리를 이용해주세요.
                     </p>
                   </div>
                 </div>
