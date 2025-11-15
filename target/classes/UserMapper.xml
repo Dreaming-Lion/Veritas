@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.mycompany.CapstoneDesign.UserMapper">
+
+    <!-- 공통 resultMap: DB snake_case → Java snake_case (1:1 매칭) -->
+    <resultMap id="userMap" type="com.mycompany.CapstoneDesign.user.UserVO">
+        <id property="user_id" column="user_id" />
+        <result property="email" column="email" />
+        <result property="password" column="password" />
+        <result property="nickname" column="nickname" />
+        <result property="create_at" column="create_at" />
+        <result property="update_at" column="update_at" />
+    </resultMap>
+
+    <!-- 이메일로 회원 검색(로그인 시 필요) -->
+    <select id="findByEmail" parameterType="String" resultMap="userMap">
+        SELECT 
+            user_id, email, password, nickname, create_at, update_at
+        FROM users
+        WHERE email = #{email};
+    </select>
+
+    <!-- 회원가입 -->
+    <insert id="insertUser" parameterType="com.mycompany.CapstoneDesign.user.UserVO">
+        INSERT INTO users
+        (email, password, nickname, create_at, update_at)
+        VALUES
+        (
+            #{email},
+            #{password},
+            #{nickname},
+            NOW(),
+            NOW()
+        )
+    </insert>
+
+    <!-- user_id로 유저 조회 -->
+    <select id="findById" parameterType="int" resultMap="userMap">
+        SELECT 
+            user_id, email, password, nickname, create_at, update_at
+        FROM users
+        WHERE user_id = #{user_id};
+    </select>
+
+    <!-- 닉네임 중복 체크 -->
+    <select id="existsNickname" parameterType="String" resultType="int">
+        SELECT COUNT(*)
+        FROM users
+        WHERE nickname = #{nickname};
+    </select>
+
+    <!-- 이메일 중복 체크 -->
+    <select id="existsEmail" parameterType="String" resultType="int">
+        SELECT COUNT(*)
+        FROM users
+        WHERE email = #{email};
+    </select>
+    
+    <!-- 전체 사용자 조회 -->
+	<select id="getUserList" resultType="com.mycompany.CapstoneDesign.user.UserVO">
+    	SELECT
+        	user_id,
+        	email,
+        	password,
+        	nickname,
+        	create_at,
+        	update_at
+    	FROM users
+    	ORDER BY user_id ASC
+	</select>
+    
+
+    <!-- 닉네임 수정 -->
+    <update id="updateNickname" parameterType="com.mycompany.CapstoneDesign.user.UserVO">
+        UPDATE users
+        SET 
+            nickname = #{nickname},
+            update_at = NOW()
+        WHERE user_id = #{user_id};
+    </update>
+
+</mapper>
