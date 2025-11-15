@@ -56,7 +56,7 @@ def iso(dt: Optional[datetime | date]):
         return None
     return dt.isoformat()
 
-# ===== 스키마 =====
+# 차후에 models에 스키마 분리해서 필요한 코드만 남기기 !!!! (잊으면 안 돼 나야...)
 class BookmarkCreate(BaseModel):
     article_id: int
 
@@ -75,9 +75,7 @@ class BookmarkListResponse(BaseModel):
 class BookmarkExistsResponse(BaseModel):
     saved: bool
 
-# ===== 엔드포인트 =====
-
-# GET /api/bookmarks  (""와 "/" 둘다 허용)
+# GET /api/bookmarks
 @router.get("", response_model=BookmarkListResponse, summary="내 북마크 목록")
 @router.get("/", response_model=BookmarkListResponse, include_in_schema=False)
 def list_bookmarks(

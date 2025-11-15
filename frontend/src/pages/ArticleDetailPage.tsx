@@ -201,6 +201,7 @@ const ArticleDetailPage: React.FC = () => {
   const [opposing, setOpposing] = React.useState<OpposingNews | null>(null);
   const [bill, setBill] = React.useState<BillInfo | null>(null);
   const [briefing, setBriefing] = React.useState<BriefingInfo | null>(null);
+  const [metaLoaded, setMetaLoaded] = React.useState(false);
 
   // summary 전용 상태
   const [summary, setSummary] = React.useState<string | null>(null);
@@ -253,6 +254,9 @@ const ArticleDetailPage: React.FC = () => {
         if (!res.ok) return;
         const json: MetaResponse = await res.json();
         if (!mounted) return;
+
+        setMetaLoaded(true);
+
         if (json.claim) setClaim(json.claim);
         if (json.opposing) setOpposing(json.opposing);
         if (json.bill) setBill(json.bill);
@@ -548,36 +552,54 @@ const ArticleDetailPage: React.FC = () => {
             <Card interactive>
               <SectionHeader icon={<span className="text-green-600">{Icon.mic}</span>} title="관련 브리핑 정보" />
               <div className="p-4">
-                {briefing ? (
-                  <div className="rounded-lg bg-green-50/60 border border-green-100">
-                    <div className="border-l-4 border-green-400 px-4 py-3 space-y-2 text-green-950/90">
-                      <div className="text-sm">
-                        <span className="text-green-700/80">부처</span>
-                        <span className="ml-2 font-medium">{briefing.dept}</span>
+                {metaLoaded ? (
+                  briefing ? (
+                    // 브리핑 있을 때
+                    <div className="rounded-lg bg-green-50/60 border border-green-100">
+                      <div className="border-l-4 border-green-400 px-4 py-3 space-y-2 text-green-950/90">
+                        <div className="text-sm">
+                          <span className="text-green-700/80">부처</span>
+                          <span className="ml-2 font-medium">{briefing.dept}</span>
+                        </div>
+                        <div className="text-sm">
+                          <span className="text-green-700/80">일자</span>
+                          <span className="ml-2 font-medium">{briefing.date}</span>
+                        </div>
+                        <div className="font-semibold">{briefing.title}</div>
+                        <p className="text-sm">{briefing.summary}</p>
+                        {briefing.url && (
+                          <a
+                            href={briefing.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center justify-center gap-1 rounded-full bg-white border border-green-200 px-4 py-2 text-sm !text-green-700 hover:bg-green-50 transition focus:outline-none"
+                          >
+                            브리핑 전문 보기
+                            <svg viewBox="0 0 24 24" className="w-4 h-4">
+                              <path
+                                d="M9 18l6-6-6-6"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                fill="none"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </a>
+                        )}
                       </div>
-                      <div className="text-sm">
-                        <span className="text-green-700/80">일자</span>
-                        <span className="ml-2 font-medium">{briefing.date}</span>
-                      </div>
-                      <div className="font-semibold">{briefing.title}</div>
-                      <p className="text-sm">{briefing.summary}</p>
-                      {briefing.url && (
-                        <a
-                          href={briefing.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center justify-center gap-1 rounded-full bg-white border border-green-200 px-4 py-2 text-sm !text-green-700 hover:bg-green-50 transition focus:outline-none"
-                        >
-                          브리핑 전문 보기
-                          <svg viewBox="0 0 24 24" className="w-4 h-4">
-                            <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </a>
-                      )}
                     </div>
-                  </div>
+                  ) : (
+                    // 브리핑이 null인 경우
+                    <div className="rounded-lg bg-gray-50 border border-green-100 px-4 py-3 text-gray-600">
+                      브리핑 정보가 없습니다. 이 기사는 정부 공식 브리핑과 직접적으로 연계되지 않았을 수 있습니다.
+                    </div>
+                  )
                 ) : (
-                  <div className="rounded-lg bg-gray-50 border border-green-100 px-4 py-3 text-gray-600">연동 준비 중입니다.</div>
+                  // API 로딩 중이거나, API가 실패한 경우
+                  <div className="rounded-lg bg-gray-50 border border-green-100 px-4 py-3 text-gray-600">
+                    브리핑 정보를 불러오는 중입니다.
+                  </div>
                 )}
               </div>
             </Card>

@@ -159,7 +159,6 @@ def _handle_recommend(background_tasks: BackgroundTasks,
     result = _recompute_and_upsert(clicked_link, hours_window, topk_return, nli_threshold)
     return result
 
-# ------------------- 라이브(캐시 우선) 엔드포인트 -------------------
 
 @router.get("/article/recommend")
 def recommend_articles(

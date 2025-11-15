@@ -18,6 +18,7 @@ from app.api.routes_auth import router as auth_router
 from app.db.init_db import init_db_2
 from app.api.bookmarks import router as bookmarks_router
 from app.api.inquiries import router as inquiries_router
+from app.api.article_meta import router as article_meta_router
 
 BOOTSTRAP_DO_CRAWL   = os.getenv("BOOTSTRAP_DO_CRAWL", "1") == "1"
 BOOTSTRAP_LOOKBACK_H = int(os.getenv("BOOTSTRAP_LOOKBACK_H", "720"))
@@ -41,6 +42,8 @@ def job_naver():
     print("[job_naver] 네이버 뉴스 크롤링 시작")
     try:
         crawl_news()
+        print("[job_rss] RSS 뉴스 크롤링 시작")
+        crawl_rss()
     finally:
         print("[job_naver] 요약 작업 시작")
         run_summary_after_crawl(limit=SUMMARY_LIMIT_AFTER_CRAWL)
@@ -72,7 +75,6 @@ def start_scheduler_once():
     print("[scheduler] started")
 
 def bootstrap_heavy_jobs():
-    """무거운 초기 작업을 스케줄러에서 실행(서버 기동은 막지 않음)"""
     print("[bootstrap] heavy bootstrap start")
     try:
         if BOOTSTRAP_DO_CRAWL:
@@ -141,3 +143,4 @@ app.include_router(article_ready.router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(bookmarks_router, prefix="/api")
 app.include_router(inquiries_router, prefix="/api")
+app.include_router(article_meta_router, prefix="/api")
