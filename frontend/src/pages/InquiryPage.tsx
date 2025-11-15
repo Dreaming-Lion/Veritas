@@ -70,10 +70,11 @@ const InquiryPage: React.FC = () => {
       return;
     }
 
+    
     try {
       setSubmitting(true);
       await createInquiry({ title: t, content: c });
-      setSuccess("문의가 성공적으로 제출되었습니다. 감사합니다!");
+      setSuccess("문의가 성공적으로 제출되었습니다. 감사합니다.");
       setTitle("");
       setContent("");
     } catch (err: any) {
