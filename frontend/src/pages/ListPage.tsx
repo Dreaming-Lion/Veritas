@@ -1,4 +1,3 @@
-// src/pages/MyPage.tsx
 import React from "react";
 
 /* ---------- API & 타입 ---------- */
@@ -193,7 +192,7 @@ const ListPage: React.FC = () => {
       setItems(j.items || []);
       setCount(j.count || 0);
     } catch (e: any) {
-    console.error(e); // 개발용 로그
+    console.error(e);
     setErr("일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
     setItems([]);
     setCount(0);
