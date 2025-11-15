@@ -8,12 +8,7 @@
 	
 	<context:component-scan base-package="com.mycompany.CapstoneDesign" />
 	
-	<bean id="ds" class="org.apache.commons.dbcp.BasicDataSource">
-		<property name="driverClassName" value="com.mysql.cj.jdbc.Driver"/>
-		<property name="url" value="jdbc:mysql://127.0.0.1:3306/jspdb?serverTimezone=UTC"/>
-		<property name="username" value="jspuser"/>
-		<property name="password" value="jsppass"/>
-	</bean>
+	
 	
 	<!-- SqlSession Object  -->
 	<bean id="sqlSession" class="org.mybatis.spring.SqlSessionFactoryBean">
