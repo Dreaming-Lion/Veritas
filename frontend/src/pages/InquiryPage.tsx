@@ -276,5 +276,5 @@ const InquiryPage: React.FC = () => {
     </div>
   );
 };
-
+  
 export default InquiryPage;
