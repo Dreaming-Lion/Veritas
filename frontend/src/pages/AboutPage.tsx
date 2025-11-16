@@ -1,13 +1,228 @@
+// src/pages/AboutPage.tsx
+import React from "react";
+import { Link } from "react-router-dom";
+import { Card } from "../components/common/Card";
+
 const AboutPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-white overflow-x-hidden">
       <main
-        className="w-screen py-12 bg-white"
-        style={{ width: "calc(100vw - 32px)" }}
+        className="
+          w-screen min-h-screen
+          px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30
+          bg-gradient-to-b from-white to-green-50
+          pt-12 pb-16
+        "
+        style={{ margin: 0, width: "calc(100vw - 52px)" }}
       >
+        <div
+          className="
+            mx-4 sm:mx-8 md:mx-12 lg:mx-16 xl:mx-24 2xl:mx-36
+            flex flex-col items-center gap-8 sm:gap-10  
+          "
+          style={{ fontFamily: "'SUITE', sans-serif" }}
+        >
+          {/* 프로젝트 소개 HERO */}
+          <section
+            className="
+              w-full max-w-sm sm:max-w-md md:max-w-lg
+              lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl
+            "
+          >
+            <Card glossy>
+              <div className="p-6 sm:p-8 lg:p-10 text-center">
+                <h1 className="!text-2xl sm:!text-3xl lg:!text-4xl font-extrabold text-green-700">
+                  Veritas 프로젝트 소개
+                </h1>
+                <br />
+                <p className="mt-3 text-gray-700 leading-relaxed">
+                  <span className="font-semibold">Veritas</span>는 정치 뉴스를
+                  한쪽 시각에 치우치지 않고, 다양한 관점에서 바라볼 수 있도록
+                  돕는 <span className="font-semibold">미디어 리터러시 플랫폼</span>
+                  입니다.
+                  <br /><br className="hidden sm:inline" />현대 사회에서 개인화를 위해 주로 사용되는 추천 알고리즘은 사용자의 만족도는 증가시키지만, 
+                  자신의 견해가 옳다는 것을 확인시켜주는 증거는 적극적으로 찾고, 반박하는 증거는 찾으려 하지 않거나 무시하는 경향성인 확증 편향 문제를 심화시킵니다.
+                  이로 인해 사람들의 견해가 양극화되고,
+                  자신과 다른 의견을 가진 사람들에 대한 이해와 대화가 점점 어려워지고 있으며,
+                  자극적인 주장과 가짜 뉴스가 더 잘 퍼지면서, 사회 전체의 신뢰와 민주적 의사결정 역시 흔들리고 있습니다.
+                  <br /><br className="hidden sm:inline" />Veritas는 이러한 상황 속에서 사용자들이 미디어 리터러시 역량을 강화시키고 스스로 판단할 수 있는 능력을 기를 수 있도록 하는 것을 목표로 합니다.
+
+                  <br /><br className="hidden sm:inline" />일반적으로 미디어 리터러시 능력을 강화하는 방법에는 자신의 견해와 반대되는 의견을 가진
+                  저자의 글을 읽거나, 다양한 정치 스펙트럼 뉴스 매체를 참고하여 여러 각도에서 생각해 보는 비판적 사고 능력을 기르는 것이 있습니다.
+                  <br /><br className="hidden sm:inline" />
+                  본 서비스는 사용자가 클릭한 기사 뿐만 아니라,
+                  해당 기사와 상반되는 관점의 기사를 함께 제공하며,
+                  법안 발의나 뉴스 브리핑과 같은 주요 정치 정보에 대해서는 제안 이유와 주요 내용이 담긴
+                  원본 자료를 함께 제시하여 사용자가 왜곡되지 않은 정보를 바탕으로 증거 기반의 정치적 판단을 내릴 수 있도록 하고 있습니다.
+                  <br />
+                </p>
+
+                {/* 버튼 + 설명 중앙 정렬 */}
+                <div className="mt-5 flex flex-col sm:flex-row gap-3 items-center justify-center text-center">
+                  <Link
+                    to="/guide"
+                    className="
+                      inline-block rounded-full font-semibold px-6 py-3
+                      !text-white
+                      bg-gradient-to-r from-green-300 via-green-400 to-green-600
+                      shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_10px_24px_rgba(22,163,74,0.25)]
+                      ring-1 ring-green-400/30
+                      hover:from-green-400 hover:via-green-500 hover:to-green-700
+                      transition-all duration-200
+                      focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-green-300
+                    "
+                  >
+                    이용 가이드 보러가기
+                  </Link>
+                </div>
+              </div>
+            </Card>
+          </section>
+
+          {/* 프로젝트 상세 설명 */}
+          <section
+            className="
+              w-full max-w-sm sm:max-w-md md:max-w-lg
+              lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl
+            "
+          >
+            <Card>
+              <div className="p-6 sm:p-8 lg:p-10 grid gap-6 lg:grid-cols-2">
+                <div>
+                  <h2 className="text-xl font-bold text-green-700">
+                    프로젝트 목표
+                  </h2>
+                  <ul className="mt-3 space-y-2 text-gray-700 text-sm sm:text-base">
+                    <li>• 정치 뉴스 소비 시 편향을 줄이고, 다양한 관점을 제시하기</li>
+                    <li>• 신뢰성 있는 1차 자료를 함께 제공하여 정보 왜곡을 줄이기</li>
+                    <li>• 사용자의 미디어 리터러시 역량을 자연스럽게 향상시키기</li>
+                    <li>• 쉽고 직관적인 UI로 누구나 편하게 사용할 수 있는 서비스 만들기</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h2 className="text-xl font-bold text-green-700">
+                    핵심 기능
+                  </h2>
+                  <ul className="mt-3 space-y-2 text-gray-700 text-sm sm:text-base">
+                    <li>• 15개 국내 언론사의 RSS 기반 정치 뉴스 통합 제공</li>
+                    <li>• 클릭한 기사와 반대 성향 언론사의 기사 추천</li>
+                    <li>• 정책 브리핑·법안 발의 등 1차 자료 연동</li>
+                    <li>• 관심 기사 북마크 및 나만의 뉴스 컬렉션 관리</li>
+                    <li>• 문의/피드백을 통한 서비스 개선 채널 제공</li>
+                  </ul>
+                </div>
+              </div>
+            </Card>
+          </section>
+
+          {/* 팀원 소개 */}
+          <section
+            className="
+              w-full max-w-sm sm:max-w-md md:max-w-lg
+              lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl
+            "
+          >
+            <Card>
+              <div className="p-6 sm:p-8 lg:p-10">
+                <h2 className="text-xl sm:text-2xl font-bold text-green-700 text-center">
+                  팀 소개
+                </h2>
+                <p className="mt-2 mb-6 text-center text-gray-600 text-sm sm:text-base">
+                  Veritas는 기획, 개발, 데이터, 디자인이 함께 협업하는 팀 프로젝트입니다.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  <TeamCard
+                    name="김민지"
+                    role="기획 · PM"
+                    desc="서비스 전체 컨셉과 기능 기획, 일정 관리 및 프로젝트 전반을 리드했습니다."
+                  />
+                  <TeamCard
+                    name="이서준"
+                    role="프론트엔드"
+                    desc="React 기반 화면 설계와 인터랙션, 반응형 UI 구현을 담당했습니다."
+                  />
+                  <TeamCard
+                    name="박지우"
+                    role="백엔드"
+                    desc="인증, 뉴스 API 연동, 북마크 및 문의 기능의 서버 로직을 구현했습니다."
+                  />
+                  <TeamCard
+                    name="정현우"
+                    role="데이터 · 추천"
+                    desc="RSS 크롤링 파이프라인과 기사 추천 로직, 성향 분류 모델을 담당했습니다."
+                  />
+                  <TeamCard
+                    name="최윤아"
+                    role="디자인 · UX"
+                    desc="브랜딩 컬러, 컴포넌트 디자인, 사용성 개선을 위한 UX 플로우를 설계했습니다."
+                  />
+                  <TeamCard
+                    name="한지민"
+                    role="리서치 · 검증"
+                    desc="언론사 분류 기준, 1차 자료 매칭 규칙, 미디어 리터러시 관점에서의 검증을 진행했습니다."
+                  />
+                </div>
+              </div>
+            </Card>
+          </section>
+
+          {/* 마지막 한 줄 소개 */}
+          <section
+            className="
+              w-full max-w-sm sm:max-w-md md:max-w-lg
+              lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl
+            "
+          >
+            <Card glossy>
+              <div className="p-6 sm:p-8 lg:p-10 text-center">
+                <p className="text-sm sm:text-base text-gray-700 leading-relaxed">
+                  Veritas 팀은 정치 뉴스 소비가{" "}
+                  <span className="font-semibold">조금 더 덜 피곤하고, 조금 더 공정하게</span>{" "}
+                  느껴지길 바라며 서비스를 만들어가고 있습니다.
+                  <br className="hidden sm:inline" />
+                  앞으로도 더 나은 기능과 경험을 위해 계속해서 실험하고 개선하겠습니다.
+                </p>
+              </div>
+            </Card>
+          </section>
+        </div>
       </main>
     </div>
   );
 };
 
 export default AboutPage;
+
+/** =========================
+ *  팀 카드 컴포넌트
+ * ========================= */
+function TeamCard({
+  name,
+  role,
+  desc,
+}: {
+  name: string;
+  role: string;
+  desc: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-green-100/70 bg-white/90 px-4 py-4 sm:px-5 sm:py-5 shadow-sm">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="size-10 sm:size-11 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold">
+          {name.slice(0, 1)}
+        </div>
+        <div className="text-left">
+          <div className="text-sm sm:text-base font-semibold text-slate-900">
+            {name}
+          </div>
+          <div className="text-xs sm:text-sm text-green-700 font-medium">
+            {role}
+          </div>
+        </div>
+      </div>
+      <p className="text-xs sm:text-sm text-gray-700 leading-relaxed">{desc}</p>
+    </div>
+  );
+}
