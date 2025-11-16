@@ -117,7 +117,11 @@ def compute_recommendations(clicked_link: str,
                 "normalized": normalize_clicked(b_link),
             }
 
-        premise = summarize_text(b_text or b_title, ratio=0.2) or (b_title or "")
+        # TF-IDF용 - 제목 + 본문 일부(잘라서)
+        premise_tfidf = f"{b_title or ''} {(b_text or '')[:1500]}".strip()
+
+        # NLI용 - 요약본 (너무 길지 않게)
+        premise_nli = summarize_text(b_text or b_title, ratio=0.2) or (b_title or "")
 
         rows = _fetch_candidates(cur, b_lean, b_date, normalize_clicked(b_link), hours_window)
     finally:
@@ -133,14 +137,15 @@ def compute_recommendations(clicked_link: str,
     leans  = [r[4] for r in rows]
     dates  = [r[5] for r in rows]
 
-    # TF-IDF 상위 후보
+    # TF-IDF 상위 후보 (제목 + 본문 일부)
     docs = [(t or "") + " " + ((x or "")[:1500]) for t, x in zip(titles, texts)]
     tfidf = TfidfVectorizer(min_df=2, ngram_range=(1, 2))
     try:
-        X = tfidf.fit_transform([premise] + docs)
+        X = tfidf.fit_transform([premise_tfidf] + docs)
         sims = cosine_similarity(X[0], X[1:]).ravel()
     except ValueError:
         sims = [0.0 for _ in docs]
+
     K = min(50, len(docs))
     cand_idx = sorted(range(len(docs)), key=lambda i: sims[i], reverse=True)[:K]
 
@@ -148,7 +153,8 @@ def compute_recommendations(clicked_link: str,
     for i in cand_idx:
         hyp = summarize_text(texts[i] or titles[i], ratio=0.2) or (titles[i] or "")
         try:
-            label, probs = nli_infer(premise, hyp)
+            # 요약본 premise_nli 사용
+            label, probs = nli_infer(premise_nli, hyp)
         except Exception:
             continue
 
@@ -181,3 +187,4 @@ def compute_recommendations(clicked_link: str,
         "clicked": normalize_clicked(b_link),
         "recommendations": picks[:topk_return]
     }
+
