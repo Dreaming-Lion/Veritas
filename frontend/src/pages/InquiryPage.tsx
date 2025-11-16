@@ -86,7 +86,7 @@ const InquiryPage: React.FC = () => {
     <div className="min-h-screen bg-white overflow-x-hidden">
       <main
         className="w-screen min-h-screen px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30 bg-gradient-to-b from-white to-green-50 pt-12"
-        style={{ paddingBottom: 0, margin: 0, width: "calc(100vw - 28px)" }}
+        style={{ paddingBottom: 0, width: "calc(100vw - 28px)" }}
       >
         {/* 가운데 카드 + 아래 안내 카드 같이 감싸는 컨테이너 */}
         <div className="mx-4 sm:mx-8 md:mx-12 lg:mx-16 xl:mx-24 2xl:mx-36 flex flex-col items-center gap-4 mb-10">
