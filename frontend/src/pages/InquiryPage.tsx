@@ -17,7 +17,6 @@ type InquiryItem = {
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
 const InquiryPage: React.FC = () => {
-
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 
@@ -45,7 +44,6 @@ const InquiryPage: React.FC = () => {
       throw Object.assign(new Error("unauthorized"), { code: 401 });
     }
     if (!res.ok) {
-      // FastAPI 에러 표준(detail)
       const j = await res.json().catch(() => ({}));
       const msg = j?.detail || `HTTP ${res.status}`;
       throw new Error(msg);
@@ -73,7 +71,6 @@ const InquiryPage: React.FC = () => {
       setSuccess("문의가 성공적으로 제출되었습니다. 감사합니다!");
       setTitle("");
       setContent("");
-
     } catch (err: any) {
       if (err?.code === 401) {
         setError("로그인 후 이용 가능한 서비스입니다.");
@@ -107,7 +104,9 @@ const InquiryPage: React.FC = () => {
                 </div>
               </div>
               <h3 className="text-3xl font-bold text-gray-900 mb-2">문의하기</h3>
-              <p className="text-gray-600 mb-6">불편한 점이 있다면 문의를 남겨주세요!</p>
+              <p className="text-gray-600 mb-6">
+                불편한 점이 있다면 문의를 남겨주세요!
+              </p>
               <hr className="border-gray-200" />
             </div>
 
@@ -128,7 +127,10 @@ const InquiryPage: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="space-y-6 mt-8">
               <div>
-                <label htmlFor="title" className="block text-base font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="title"
+                  className="block text-base font-medium text-gray-700 mb-2"
+                >
                   제목
                 </label>
                 <input
@@ -145,11 +147,16 @@ const InquiryPage: React.FC = () => {
                     transition-all duration-200 disabled:opacity-60
                   "
                 />
-                <div className="mt-1 text-xs text-gray-400">{title.length}/200</div>
+                <div className="mt-1 text-xs text-gray-400">
+                  {title.length}/200
+                </div>
               </div>
 
               <div>
-                <label htmlFor="content" className="block text-base font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="content"
+                  className="block text-base font-medium text-gray-700 mb-2"
+                >
                   내용
                 </label>
                 <textarea

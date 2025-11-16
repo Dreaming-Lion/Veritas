@@ -97,6 +97,7 @@ const Header: React.FC = () => {
   const onLogout = () => {
     localStorage.removeItem("access_token");
     refreshAuthFromStorage();
+    window.location.reload();
   };
 
   return (
