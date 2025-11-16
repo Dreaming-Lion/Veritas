@@ -14,11 +14,6 @@ from app.api.summary import router as summary_router, run_summary_after_crawl
 from app.services.recommend_batch import precompute_recent
 from app.model.model import load_model
 from app.api import article_reco, article_ready
-from app.db.databases import Base as AuthBase, engine as auth_engine  # 남겨둠(추후 마이그레이션 등)
-from app.api.routes_auth import router as auth_router
-from app.db.init_db import init_db_2
-from app.api.bookmarks import router as bookmarks_router
-from app.api.inquiries import router as inquiries_router
 from app.api.article_meta import router as article_meta_router
 
 BOOTSTRAP_DO_CRAWL   = os.getenv("BOOTSTRAP_DO_CRAWL", "1") == "1"
@@ -115,7 +110,6 @@ def bootstrap_heavy_jobs():
 async def lifespan(app: FastAPI):
     print("[startup] init_db & ensure_cache_table")
     init_db()
-    init_db_2()
     article_reco.ensure_cache_table()
 
     print("[startup] load_model")
@@ -161,7 +155,4 @@ app.include_router(article_router, prefix="/api")
 app.include_router(summary_router, prefix="/api")
 app.include_router(article_reco.router, prefix="/api")
 app.include_router(article_ready.router, prefix="/api")
-app.include_router(auth_router, prefix="/api")
-app.include_router(bookmarks_router, prefix="/api")
-app.include_router(inquiries_router, prefix="/api")
 app.include_router(article_meta_router, prefix="/api")

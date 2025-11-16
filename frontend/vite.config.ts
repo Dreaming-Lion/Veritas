@@ -16,6 +16,10 @@ export default defineConfig({
         target: "http://backend:8080",
         changeOrigin: true,
       },
+      "/api/inquiries": {
+        target: "http://backend:8080",
+        changeOrigin: true,
+      },
       "/api": {
         target: "http://ai:8001",
         changeOrigin: true,

@@ -1,48 +1,51 @@
 package com.veritas.backend.entity;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(
-    name = "users",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uq_users_email", columnNames = "email")
-    }
+        name = "users",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_users_email", columnNames = "email")
+        }
 )
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "nickname", length = 50, nullable = false)
+    @Column(nullable = false, length = 50)
     private String nickname;
 
-    @Column(name = "email", length = 255, nullable = false, unique = true)
+    @Column(nullable = false, length = 255, unique = true)
     private String email;
 
-    @Column(name = "password_hash", length = 255, nullable = false)
+    @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
-    protected User() {}
-
-    public User(String nickname, String email, String passwordHash) {
-        this.nickname = nickname;
-        this.email = email;
-        this.passwordHash = passwordHash;
+    @PrePersist
+    public void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 
-    public Long getId() { return id; }
-    public String getNickname() { return nickname; }
-    public String getEmail() { return email; }
-    public String getPasswordHash() { return passwordHash; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
-
-    public void setNickname(String nickname) { this.nickname = nickname; }
-    public void setEmail(String email) { this.email = email; }
-    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public static User create(String nickname, String email, String passwordHash) {
+        User u = new User();
+        u.nickname = nickname;
+        u.email = email;
+        u.passwordHash = passwordHash;
+        return u;
+    }
 }

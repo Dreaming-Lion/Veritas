@@ -14,7 +14,7 @@ type InquiryItem = {
   excerpt?: string | null;
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
+const API_BASE = import.meta.env.API_BASE ?? "/api";
 
 const InquiryPage: React.FC = () => {
   const [title, setTitle] = useState("");

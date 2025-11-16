@@ -2,7 +2,7 @@
 import React from "react";
 
 /* ---------- API & 타입 ---------- */
-const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
+const API_BASE = import.meta.env.API_BASE ?? "/api";
 type Status = "pending" | "answered" | "closed";
 type InquiryBrief = {
   id: number;

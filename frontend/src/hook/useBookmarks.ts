@@ -19,10 +19,21 @@ type ApiArticle = {
   link?: string | null;
 };
 
-type BackendListResponse = { count: number; articles: ApiArticle[] };
+type BackendListResponse = {
+  count: number;
+  articles: {
+    id: number;
+    title: string;
+    content?: string | null;
+    summary?: string | null;
+    date?: string | null;
+    link?: string | null;
+  }[];
+};
+
 
 const apiUrl = (path: string) => {
-  const base = import.meta.env.VITE_API_BASE as string | undefined;
+  const base = import.meta.env.API_BASE as string | undefined;
   return base ? `${base}${path}` : `/api${path}`;
 };
 

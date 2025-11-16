@@ -1,5 +1,5 @@
 // src/services/auth.ts
-const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
+const API_BASE = import.meta.env.API_BASE ?? "/api";
 
 export type LoginPayload = {
   email: string;

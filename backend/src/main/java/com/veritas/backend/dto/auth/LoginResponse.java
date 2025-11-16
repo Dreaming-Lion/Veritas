@@ -6,7 +6,7 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class TokenResponse {
+public class LoginResponse {
 
     @JsonProperty("access_token")
     private String accessToken;

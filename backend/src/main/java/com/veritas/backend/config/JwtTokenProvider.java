@@ -1,17 +1,16 @@
 package com.veritas.backend.config;
 
-import com.veritas.backend.domain.auth.UserPrincipal;  
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jws;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.JwtException;
+import com.veritas.backend.domain.auth.UserPrincipal;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.security.Key;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
 @Component
@@ -23,54 +22,41 @@ public class JwtTokenProvider {
     @Value("${jwt.access-token-expire-minutes:1440}")
     private long accessTokenExpireMinutes;
 
-    private SecretKey key;
+    private Key key;
 
     @PostConstruct
     public void init() {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String createAccessToken(Long userId, String email) {
-        return createToken(userId, email);
-    }
-
-    public String createToken(Long userId, String email) {
-        Date now = new Date();
-        Date expiry = new Date(now.getTime() + accessTokenExpireMinutes * 60_000L);
+    public String createAccessToken(Long userId, String email, String nickname) {
+        Instant now = Instant.now();
+        Instant expiry = now.plus(accessTokenExpireMinutes, ChronoUnit.MINUTES);
 
         return Jwts.builder()
-                .subject(String.valueOf(userId))
+                .setSubject(String.valueOf(userId))
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(expiry))
                 .claim("email", email)
-                .issuedAt(now)
-                .expiration(expiry)
-                .signWith(key)
+                .claim("nickname", nickname)  
+                .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
 
     public Jws<Claims> parseToken(String token) throws JwtException {
         return Jwts.parser()
-                .verifyWith(key)
+                .setSigningKey(key)
                 .build()
                 .parseSignedClaims(token);
     }
 
-    public Long getUserId(String token) {
-        Claims claims = parseToken(token).getPayload();
-        return Long.parseLong(claims.getSubject());
-    }
+    public UserPrincipal toPrincipal(String token) throws JwtException {
+        Jws<Claims> jws = parseToken(token);
+        Claims claims = jws.getBody();
 
-    public String getEmail(String token) {
-        Claims claims = parseToken(token).getPayload();
-        return claims.get("email", String.class);
-    }
+        Long userId = Long.parseLong(claims.getSubject());
+        String email = claims.get("email", String.class);
 
-    public UserPrincipal toPrincipal(String token) {
-        try {
-            Long userId = getUserId(token);
-            String email = getEmail(token);
-            return new UserPrincipal(userId, email);
-        } catch (JwtException | IllegalArgumentException e) {
-            return null;
-        }
+        return new UserPrincipal(userId, email);
     }
 }
