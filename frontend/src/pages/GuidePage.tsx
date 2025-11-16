@@ -12,7 +12,7 @@ const GuidePage: React.FC = () => {
           px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30
           pt-12 pb-16              
         "
-        style={{ margin: 0, width: "calc(100vw - 55px)" }}  
+        style={{ margin: 0, width: "calc(100vw - 52px)" }}  
       >
         {/* InquiryPage와 같은 바깥 컨테이너 */}
         <div
@@ -29,9 +29,10 @@ const GuidePage: React.FC = () => {
               lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl
             "
           >
+
           <Card glossy>
             <div className="p-6 sm:p-8 lg:p-10 text-center">
-              <h1 className="text-2xl sm:text-4xl font-extrabold text-green-700">
+              <h1 className="!text-2xl sm:!text-3xl lg:!text-4xl font-extrabold text-green-700">
                 Veritas 이용 가이드
               </h1>
               <p className="mt-3 text-gray-600">
@@ -54,6 +55,7 @@ const GuidePage: React.FC = () => {
               </Link>
             </div>
           </Card>
+
           </section>
 
           {/* FEATURES 섹션 */}
