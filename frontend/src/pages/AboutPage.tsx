@@ -92,11 +92,16 @@ const AboutPage: React.FC = () => {
                   <h2 className="text-xl font-bold text-green-700">
                     프로젝트 목표
                   </h2>
-                  <ul className="mt-3 space-y-2 text-gray-700 text-sm sm:text-base">
-                    <li>• 정치 뉴스 소비 시 편향을 줄이고, 다양한 관점을 제시하기</li>
-                    <li>• 신뢰성 있는 1차 자료를 함께 제공하여 정보 왜곡을 줄이기</li>
-                    <li>• 사용자의 미디어 리터러시 역량을 자연스럽게 향상시키기</li>
-                    <li>• 쉽고 직관적인 UI로 누구나 편하게 사용할 수 있는 서비스 만들기</li>
+                  <ul
+                    className="
+                      mt-3 space-y-2 text-gray-700 text-sm sm:text-base
+                      list-disc list-outside pl-5
+                    "
+                  >
+                    <li>개인화 추천이 심화시키는 확증 편향 문제를 줄이고, 사용자가 다양한 관점을 접할 수 있도록 하여 정치적 양극화 문제를 완화한다.</li>
+                    <li>이를 위해 사용자가 클릭한 기사 뿐만 아니라, 반대 성향의 언론사 기사를 함께 추천해 균형 잡힌 정보를 제공한다.</li>
+                    <li>정책 브리핑/법률 발의안 관련 뉴스의 경우, 원문 자료를 함께 제시하여 사용자가 왜곡된 기사에만 의존하지 않고 증거 기반 판단을 내릴 수 있도록 한다.</li>
+                    <li>TF-IDF와 NLI 기반의 정교한 기사 추천을 안정적인 응답 속도로 제공받을 수 있도록 한다.</li>
                   </ul>
                 </div>
 
@@ -104,12 +109,18 @@ const AboutPage: React.FC = () => {
                   <h2 className="text-xl font-bold text-green-700">
                     핵심 기능
                   </h2>
-                  <ul className="mt-3 space-y-2 text-gray-700 text-sm sm:text-base">
-                    <li>• 15개 국내 언론사의 RSS 기반 정치 뉴스 통합 제공</li>
-                    <li>• 클릭한 기사와 반대 성향 언론사의 기사 추천</li>
-                    <li>• 정책 브리핑·법안 발의 등 1차 자료 연동</li>
-                    <li>• 관심 기사 북마크 및 나만의 뉴스 컬렉션 관리</li>
-                    <li>• 문의/피드백을 통한 서비스 개선 채널 제공</li>
+                  <ul
+                    className="
+                      mt-3 space-y-2 text-gray-700 text-sm sm:text-base
+                      list-disc list-outside pl-5
+                    "
+                  >
+                    <li>기사 데이터를 실시간으로 수집하여 최신 기사 제공</li>
+                    <li>기사 요약 시스템 제공</li>
+                    <li>국내 15개 언론사의 RSS 피드를 활용해 반대 성향 언론사 기사 추천 시스템 제공</li>
+                    <li>정책 브리핑/법률 발의안 등 원문 자료 연동을 통한 공정한 판단 유도</li>
+                    <li>관심 기사 북마크 기능 제공</li>
+                    <li>사용자 문의/피드백을 통한 서비스 개선</li>
                   </ul>
                 </div>
               </div>
@@ -129,39 +140,39 @@ const AboutPage: React.FC = () => {
                   팀 소개
                 </h2>
                 <p className="mt-2 mb-6 text-center text-gray-600 text-sm sm:text-base">
-                  Veritas는 기획, 개발, 데이터, 디자인이 함께 협업하는 팀 프로젝트입니다.
+                  Veritas는 6명의 개발자가 함께 협업하는 팀 프로젝트입니다.
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   <TeamCard
                     name="오인화"
                     role="PM · 풀스택"
-                    desc="서비스 전체 컨셉과 기능 기획, 일정 관리 및 프로젝트 전반을 리드했습니다."
+                    desc="&nbsp;"
                   />
                   <TeamCard
                     name="박승현"
                     role="프론트엔드"
-                    desc="React 기반 화면 설계와 인터랙션, 반응형 UI 구현을 담당했습니다."
+                    desc="&nbsp;"
                   />
                   <TeamCard
                     name="이유진"
                     role="프론트엔드"
-                    desc="인증, 뉴스 API 연동, 북마크 및 문의 기능의 서버 로직을 구현했습니다."
+                    desc="&nbsp;"
                   />
                   <TeamCard
                     name="양정효"
                     role="백엔드"
-                    desc="RSS 크롤링 파이프라인과 기사 추천 로직, 성향 분류 모델을 담당했습니다."
+                    desc="&nbsp;"
                   />
                   <TeamCard
                     name="박민성"
                     role="백엔드"
-                    desc="브랜딩 컬러, 컴포넌트 디자인, 사용성 개선을 위한 UX 플로우를 설계했습니다."
+                    desc="&nbsp;"
                   />
                   <TeamCard
                     name="LIU ZHIYUAN"
                     role="백엔드"
-                    desc="언론사 분류 기준, 1차 자료 매칭 규칙, 미디어 리터러시 관점에서의 검증을 진행했습니다."
+                    desc="&nbsp;"
                   />
                 </div>
               </div>
@@ -178,7 +189,7 @@ const AboutPage: React.FC = () => {
             <Card glossy>
               <div className="p-6 sm:p-8 lg:p-10 text-center">
                 <p className="text-sm sm:text-base text-gray-700 leading-relaxed">
-                  Veritas 팀은 정치 뉴스 소비가{" "}
+                  저희 팀은 정치 뉴스 소비가{" "}
                   <span className="font-semibold">조금 더 덜 피곤하고, 조금 더 공정하게</span>{" "}
                   느껴지길 바라며 서비스를 만들어가고 있습니다.
                   <br className="hidden sm:inline" />

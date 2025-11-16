@@ -97,7 +97,6 @@ const isNaverNewsLink = (rawLink?: string | null): boolean => {
   const fixed = rawLink.trim().replace(/&amp;/g, "&");
 
   try {
-    // base를 줘서 /mnews/... 같은 상대경로도 처리 가능
     const u = new URL(fixed, "https://news.naver.com");
     const host = u.hostname.toLowerCase();
 
@@ -106,7 +105,6 @@ const isNaverNewsLink = (rawLink?: string | null): boolean => {
 
     return false;
   } catch {
-    // URL 파싱 실패 시 문자열 기준으로 대충 한 번 더 체크
     const s = fixed.toLowerCase();
     return (
       s.includes("news.naver.com") ||
@@ -168,7 +166,7 @@ const Card: React.FC<{
         <span className="text-xs text-gray-400">{relative}</span>
         <span
           onClick={(e) => {
-            e.preventDefault(); // 링크 이동 방지
+            e.preventDefault();
             onToggle();
           }}
         >
@@ -212,13 +210,16 @@ const MainPage: React.FC = () => {
   const { isSaved, toggle } = useBookmarks();
   const { open: openAuth } = useAuthDialog();
 
+  // ✅ 네이버 뉴스만 strict 필터
   const mapArticles = (list: ApiArticle[]): ArticleEx[] => {
-    // 1차: 네이버 뉴스만 필터
-    const filtered = list.filter((a) => isNaverNewsLink(a.link));
+    const filtered = list.filter((a) => {
+      const ok = isNaverNewsLink(a.link);
+      // 디버깅용: 필요 없으면 나중에 지워도 됨
+      console.log("[isNaverNewsLink]", a.link, "=>", ok);
+      return ok;
+    });
 
-    // 디버깅용 로그 (필요 없으면 지워도 됨)
     if (list.length > 0) {
-      console.log("[/article] first raw link =", list[0].link);
       console.log(
         "[/article] filtered count / raw count =",
         filtered.length,
@@ -227,9 +228,7 @@ const MainPage: React.FC = () => {
       );
     }
 
-    const baseList = filtered.length > 0 ? filtered : list;
-
-    return baseList.map((a) => ({
+    return filtered.map((a) => ({
       id: a.id,
       title: cleanTitle(a.title),
       excerpt: toExcerpt(a.summary ?? a.content),
@@ -245,16 +244,15 @@ const MainPage: React.FC = () => {
       const res = await fetch(
         apiUrl(`/article?limit=${PAGE_SIZE}&offset=${offset}`),
         {
-          headers: { Accept: "application/json" },
+        headers: { Accept: "application/json" },
         }
       );
       if (!res.ok) throw new Error(`GET /article 실패 (status ${res.status})`);
       const j: BackendListResponse = await res.json();
 
-      const rawCount = j.articles?.length ?? 0; // 서버에서 실제로 가져온 개수
+      const rawCount = j.articles?.length ?? 0;
       const mapped = mapArticles(j.articles ?? []);
 
-      // "서버에 다음 페이지가 있는지"는 필터 전 개수 기준으로 판단
       setServerHasMore(rawCount === PAGE_SIZE);
 
       return { mapped, rawCount };
@@ -266,11 +264,32 @@ const MainPage: React.FC = () => {
     const run = async () => {
       setLoading(true);
       try {
-        const { mapped: first, rawCount } = await fetchPage(0);
-        setAllItems(first);
-        setNextOffset(rawCount); // DB에서 가져온 원본 개수만큼 offset 증가
-        setVisibleCount(Math.min(PAGE_SIZE, first.length));
-        setItems(first);
+        // 초기 로딩: 네이버 기준으로 최소 PAGE_SIZE개 모을 때까지 페이지 여러 번 요청
+        let offset = 0;
+        let acc: ArticleEx[] = [];
+        let hasMore = true;
+
+        while (acc.length < PAGE_SIZE && hasMore) {
+          const { mapped, rawCount } = await fetchPage(offset);
+
+          if (rawCount === 0) {
+            hasMore = false;
+            break;
+          }
+
+          acc = acc.concat(mapped);
+          offset += rawCount;
+
+          if (rawCount < PAGE_SIZE) {
+            hasMore = false;
+          }
+        }
+
+        setAllItems(acc);
+        setItems(acc);
+        setVisibleCount(Math.min(PAGE_SIZE, acc.length));
+        setNextOffset(offset);
+        setServerHasMore(hasMore);
       } catch (e) {
         console.error(e);
         setAllItems([]);
@@ -301,13 +320,11 @@ const MainPage: React.FC = () => {
   }, [query, allItems]);
 
   const handleLoadMore = async () => {
-    // 1) 현재 items 안에서 아직 안 보여준 카드가 있으면 우선 그거부터
     if (visibleCount < items.length) {
       setVisibleCount((v) => Math.min(v + PAGE_SIZE, items.length));
       return;
     }
 
-    // 2) 서버에서 더 가져올 게 없으면 종료
     if (!serverHasMore) return;
 
     try {
@@ -328,8 +345,10 @@ const MainPage: React.FC = () => {
           : merged;
 
         setItems(afterFilter);
-        setVisibleCount((v) => Math.min(v + PAGE_SIZE, afterFilter.length));
-        setNextOffset(nextOffset + rawCount); // DB offset은 항상 "원본 개수" 기준으로 증가
+        setVisibleCount((v) =>
+          Math.min(v + PAGE_SIZE, afterFilter.length)
+        );
+        setNextOffset(nextOffset + rawCount);
       } else {
         setServerHasMore(false);
       }
@@ -357,7 +376,6 @@ const MainPage: React.FC = () => {
     }
   };
 
-  // ✅ 아이템이 하나도 없을 때는 더보기 버튼 숨김
   const canShowMore =
     items.length > 0 && (visibleCount < items.length || serverHasMore);
 
