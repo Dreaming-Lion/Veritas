@@ -190,7 +190,7 @@ const InquiryPage: React.FC = () => {
             </form>
           </div>
 
-          {/* 🔻 폼 카드 아래에 나오는 안내 카드 */}
+          {/* 폼 카드 아래에 나오는 안내 카드 */}
           <section
             className="
               w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl

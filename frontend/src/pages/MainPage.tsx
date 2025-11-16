@@ -87,6 +87,21 @@ const useNowTick = (intervalMs = 60_000) => {
   }, [intervalMs]);
 };
 
+const isNaverNewsLink = (rawLink?: string | null): boolean => {
+  if (!rawLink) return false;
+  const fixed = rawLink.replace(/&amp;/g, "&");
+
+  try {
+    const u = new URL(fixed);
+    return (
+      u.hostname === "news.naver.com" ||
+      u.hostname === "n.news.naver.com"
+    );
+  } catch {
+    return fixed.includes("news.naver.com");
+  }
+};
+
 // ------------ UI ------------
 const BookmarkButton: React.FC<{ saved: boolean; onToggle: () => void }> = ({
   saved,
@@ -175,26 +190,30 @@ const MainPage: React.FC = () => {
   const [nextOffset, setNextOffset] = React.useState(0);
   const [serverHasMore, setServerHasMore] = React.useState(true);
 
-  // ✅ 북마크 훅: 페이지에서 한 번만 사용
   const { isSaved, toggle } = useBookmarks();
   const { open: openAuth } = useAuthDialog();
 
   const mapArticles = (list: ApiArticle[]): ArticleEx[] => {
-    return list.map((a) => ({
-      id: a.id,
-      title: cleanTitle(a.title),
-      excerpt: toExcerpt(a.summary ?? a.content),
-      time: a.date ?? "",
-      press: "네이버 뉴스",
-      link: (a.link || "").replace(/&amp;/g, "&"),
-      content: a.content ? decodeHTMLEntities(a.content) : null,
-    }));
+    return list
+      .filter((a) => isNaverNewsLink(a.link)) 
+      .map((a) => ({
+        id: a.id,
+        title: cleanTitle(a.title),
+        excerpt: toExcerpt(a.summary ?? a.content),
+        time: a.date ?? "",
+        press: "네이버 뉴스",
+        link: (a.link || "").replace(/&amp;/g, "&"),
+        content: a.content ? decodeHTMLEntities(a.content) : null,
+      }));
   };
 
   const fetchPage = React.useCallback(async (offset: number) => {
-    const res = await fetch(apiUrl(`/article?limit=${PAGE_SIZE}&offset=${offset}`), {
-      headers: { Accept: "application/json" },
-    });
+    const res = await fetch(
+      apiUrl(`/article?limit=${PAGE_SIZE}&offset=${offset}`),
+      {
+        headers: { Accept: "application/json" },
+      }
+    );
     if (!res.ok) throw new Error(`GET /article 실패 (status ${res.status})`);
     const j: BackendListResponse = await res.json();
     const mapped = mapArticles(j.articles ?? []);
@@ -280,17 +299,15 @@ const MainPage: React.FC = () => {
     e.preventDefault();
   };
 
-  // ✅ 북마크 토글 핸들러: 비로그인 → 모달
   const onToggleCard = async (a: ArticleEx) => {
     if (!localStorage.getItem("access_token")) {
-      openAuth("login"); // 헤더와 동일한 모달
+      openAuth("login"); 
       return;
     }
     try {
       await toggle(a);
     } catch (e: any) {
       if (e?.code === "NEED_AUTH") openAuth("login");
-      // 그 외 에러는 콘솔
       else console.error(e);
     }
   };

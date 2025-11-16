@@ -83,6 +83,18 @@ def _fetch_candidates(cur, b_lean, b_date, normalized, hours_window: int):
             """, (b_lean, normalized))
     return cur.fetchall()
 
+from urllib.parse import urlparse
+
+NAVER_HOSTS = {"news.naver.com", "n.news.naver.com"}
+
+def _is_naver_link(url: str) -> bool:
+    try:
+        host = urlparse(url).hostname or ""
+        return host in NAVER_HOSTS
+    except Exception:
+        return False
+
+
 def compute_recommendations(clicked_link: str,
                             hours_window: int = 48,
                             topk_return: int = 8,
@@ -91,9 +103,20 @@ def compute_recommendations(clicked_link: str,
     try:
         base, normalized = _fetch_base(cur, clicked_link)
         if not base:
-            return {"error": "해당 기사를 찾을 수 없습니다.", "normalized": normalize_clicked(clicked_link)}
+            return {
+                "error": "해당 기사를 찾을 수 없습니다.",
+                "normalized": normalize_clicked(clicked_link),
+            }
 
         b_source, b_lean, b_title, b_text, b_date, b_link = base
+
+        # 네이버 기사만 허용
+        if not _is_naver_link(b_link):
+            return {
+                "error": "네이버 뉴스 기사에 대해서만 추천을 제공합니다.",
+                "normalized": normalize_clicked(b_link),
+            }
+
         premise = summarize_text(b_text or b_title, ratio=0.2) or (b_title or "")
 
         rows = _fetch_candidates(cur, b_lean, b_date, normalize_clicked(b_link), hours_window)
