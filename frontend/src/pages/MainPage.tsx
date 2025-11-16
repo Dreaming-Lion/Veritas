@@ -87,18 +87,32 @@ const useNowTick = (intervalMs = 60_000) => {
   }, [intervalMs]);
 };
 
+/**
+ * 네이버 뉴스 링크만 필터링하는 헬퍼
+ * - 절대/상대 URL 모두 처리
+ * - news.naver.com, n.news.naver.com 및 하위 서브도메인 허용
+ */
 const isNaverNewsLink = (rawLink?: string | null): boolean => {
   if (!rawLink) return false;
-  const fixed = rawLink.replace(/&amp;/g, "&");
+  const fixed = rawLink.trim().replace(/&amp;/g, "&");
 
   try {
-    const u = new URL(fixed);
-    return (
-      u.hostname === "news.naver.com" ||
-      u.hostname === "n.news.naver.com"
-    );
+    // base를 줘서 /mnews/... 같은 상대경로도 처리 가능
+    const u = new URL(fixed, "https://news.naver.com");
+    const host = u.hostname.toLowerCase();
+
+    if (host === "news.naver.com" || host === "n.news.naver.com") return true;
+    if (host.endsWith(".news.naver.com")) return true;
+
+    return false;
   } catch {
-    return fixed.includes("news.naver.com");
+    // URL 파싱 실패 시 문자열 기준으로 대충 한 번 더 체크
+    const s = fixed.toLowerCase();
+    return (
+      s.includes("news.naver.com") ||
+      s.startsWith("/mnews/") ||
+      s.startsWith("/article/")
+    );
   }
 };
 
@@ -180,6 +194,11 @@ const Card: React.FC<{
   );
 };
 
+type FetchPageResult = {
+  mapped: ArticleEx[];
+  rawCount: number; // 서버가 준 원본 기사 개수 (필터 전)
+};
+
 const MainPage: React.FC = () => {
   const [allItems, setAllItems] = React.useState<ArticleEx[]>([]);
   const [items, setItems] = React.useState<ArticleEx[]>([]);
@@ -187,47 +206,69 @@ const MainPage: React.FC = () => {
   const [loading, setLoading] = React.useState(false);
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [query, setQuery] = React.useState("");
-  const [nextOffset, setNextOffset] = React.useState(0);
+  const [nextOffset, setNextOffset] = React.useState(0); // DB offset (필터 전 개수 기준)
   const [serverHasMore, setServerHasMore] = React.useState(true);
 
   const { isSaved, toggle } = useBookmarks();
   const { open: openAuth } = useAuthDialog();
 
   const mapArticles = (list: ApiArticle[]): ArticleEx[] => {
-    return list
-      .filter((a) => isNaverNewsLink(a.link)) 
-      .map((a) => ({
-        id: a.id,
-        title: cleanTitle(a.title),
-        excerpt: toExcerpt(a.summary ?? a.content),
-        time: a.date ?? "",
-        press: "네이버 뉴스",
-        link: (a.link || "").replace(/&amp;/g, "&"),
-        content: a.content ? decodeHTMLEntities(a.content) : null,
-      }));
+    // 1차: 네이버 뉴스만 필터
+    const filtered = list.filter((a) => isNaverNewsLink(a.link));
+
+    // 디버깅용 로그 (필요 없으면 지워도 됨)
+    if (list.length > 0) {
+      console.log("[/article] first raw link =", list[0].link);
+      console.log(
+        "[/article] filtered count / raw count =",
+        filtered.length,
+        "/",
+        list.length
+      );
+    }
+
+    const baseList = filtered.length > 0 ? filtered : list;
+
+    return baseList.map((a) => ({
+      id: a.id,
+      title: cleanTitle(a.title),
+      excerpt: toExcerpt(a.summary ?? a.content),
+      time: a.date ?? "",
+      press: "네이버 뉴스",
+      link: (a.link || "").replace(/&amp;/g, "&"),
+      content: a.content ? decodeHTMLEntities(a.content) : null,
+    }));
   };
 
-  const fetchPage = React.useCallback(async (offset: number) => {
-    const res = await fetch(
-      apiUrl(`/article?limit=${PAGE_SIZE}&offset=${offset}`),
-      {
-        headers: { Accept: "application/json" },
-      }
-    );
-    if (!res.ok) throw new Error(`GET /article 실패 (status ${res.status})`);
-    const j: BackendListResponse = await res.json();
-    const mapped = mapArticles(j.articles ?? []);
-    setServerHasMore(mapped.length === PAGE_SIZE);
-    return mapped;
-  }, []);
+  const fetchPage = React.useCallback(
+    async (offset: number): Promise<FetchPageResult> => {
+      const res = await fetch(
+        apiUrl(`/article?limit=${PAGE_SIZE}&offset=${offset}`),
+        {
+          headers: { Accept: "application/json" },
+        }
+      );
+      if (!res.ok) throw new Error(`GET /article 실패 (status ${res.status})`);
+      const j: BackendListResponse = await res.json();
+
+      const rawCount = j.articles?.length ?? 0; // 서버에서 실제로 가져온 개수
+      const mapped = mapArticles(j.articles ?? []);
+
+      // "서버에 다음 페이지가 있는지"는 필터 전 개수 기준으로 판단
+      setServerHasMore(rawCount === PAGE_SIZE);
+
+      return { mapped, rawCount };
+    },
+    []
+  );
 
   React.useEffect(() => {
     const run = async () => {
       setLoading(true);
       try {
-        const first = await fetchPage(0);
+        const { mapped: first, rawCount } = await fetchPage(0);
         setAllItems(first);
-        setNextOffset(first.length);
+        setNextOffset(rawCount); // DB에서 가져온 원본 개수만큼 offset 증가
         setVisibleCount(Math.min(PAGE_SIZE, first.length));
         setItems(first);
       } catch (e) {
@@ -260,16 +301,20 @@ const MainPage: React.FC = () => {
   }, [query, allItems]);
 
   const handleLoadMore = async () => {
+    // 1) 현재 items 안에서 아직 안 보여준 카드가 있으면 우선 그거부터
     if (visibleCount < items.length) {
       setVisibleCount((v) => Math.min(v + PAGE_SIZE, items.length));
       return;
     }
+
+    // 2) 서버에서 더 가져올 게 없으면 종료
     if (!serverHasMore) return;
 
     try {
       setLoadingMore(true);
-      const next = await fetchPage(nextOffset);
-      if (next.length > 0) {
+      const { mapped: next, rawCount } = await fetchPage(nextOffset);
+
+      if (rawCount > 0) {
         const merged = [...allItems, ...next];
         setAllItems(merged);
 
@@ -284,7 +329,7 @@ const MainPage: React.FC = () => {
 
         setItems(afterFilter);
         setVisibleCount((v) => Math.min(v + PAGE_SIZE, afterFilter.length));
-        setNextOffset(nextOffset + next.length);
+        setNextOffset(nextOffset + rawCount); // DB offset은 항상 "원본 개수" 기준으로 증가
       } else {
         setServerHasMore(false);
       }
@@ -301,7 +346,7 @@ const MainPage: React.FC = () => {
 
   const onToggleCard = async (a: ArticleEx) => {
     if (!localStorage.getItem("access_token")) {
-      openAuth("login"); 
+      openAuth("login");
       return;
     }
     try {
@@ -312,20 +357,44 @@ const MainPage: React.FC = () => {
     }
   };
 
-  const canShowMore = visibleCount < items.length || serverHasMore;
+  // ✅ 아이템이 하나도 없을 때는 더보기 버튼 숨김
+  const canShowMore =
+    items.length > 0 && (visibleCount < items.length || serverHasMore);
 
   return (
     <div
       className="w-screen px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30"
-      style={{ width: "calc(100vw - 34px)" }}
+      style={{ width: "calc(100vw - 52px)" }}
     >
-      <form onSubmit={handleSubmit} role="search" aria-label="뉴스 검색" className="mb-4">
+      <form
+        onSubmit={handleSubmit}
+        role="search"
+        aria-label="뉴스 검색"
+        className="mb-4"
+      >
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
-                <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <circle
+                  cx="11"
+                  cy="11"
+                  r="7"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+                <path
+                  d="M20 20l-3.5-3.5"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
               </svg>
             </span>
             <input
@@ -356,6 +425,10 @@ const MainPage: React.FC = () => {
 
       {loading ? (
         <div className="text-sm text-gray-500">불러오는 중…</div>
+      ) : items.length === 0 ? (
+        <div className="text-sm text-gray-500">
+          표시할 네이버 뉴스가 없습니다.
+        </div>
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">

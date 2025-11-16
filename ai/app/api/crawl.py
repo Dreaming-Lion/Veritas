@@ -48,6 +48,8 @@ def clean_title(txt: str) -> str:
     """따옴표/스마트쿼트 제거 + 공백 정규화 + 노이즈 문자('$', 'quot;' 등) 제거"""
     s = html_unescape((txt or "").strip())
     s = s.replace("&quot;", "").replace("quot;", "")
+    
+    s = s.replace("&hellip;", "").replace("hellip;", "")
 
     s = s.replace("“", "").replace("”", "").replace('"', "")
 

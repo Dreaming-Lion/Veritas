@@ -134,33 +134,33 @@ const AboutPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   <TeamCard
-                    name="김민지"
-                    role="기획 · PM"
+                    name="오인화"
+                    role="PM · 풀스택"
                     desc="서비스 전체 컨셉과 기능 기획, 일정 관리 및 프로젝트 전반을 리드했습니다."
                   />
                   <TeamCard
-                    name="이서준"
+                    name="박승현"
                     role="프론트엔드"
                     desc="React 기반 화면 설계와 인터랙션, 반응형 UI 구현을 담당했습니다."
                   />
                   <TeamCard
-                    name="박지우"
-                    role="백엔드"
+                    name="이유진"
+                    role="프론트엔드"
                     desc="인증, 뉴스 API 연동, 북마크 및 문의 기능의 서버 로직을 구현했습니다."
                   />
                   <TeamCard
-                    name="정현우"
-                    role="데이터 · 추천"
+                    name="양정효"
+                    role="백엔드"
                     desc="RSS 크롤링 파이프라인과 기사 추천 로직, 성향 분류 모델을 담당했습니다."
                   />
                   <TeamCard
-                    name="최윤아"
-                    role="디자인 · UX"
+                    name="박민성"
+                    role="백엔드"
                     desc="브랜딩 컬러, 컴포넌트 디자인, 사용성 개선을 위한 UX 플로우를 설계했습니다."
                   />
                   <TeamCard
-                    name="한지민"
-                    role="리서치 · 검증"
+                    name="LIU ZHIYUAN"
+                    role="백엔드"
                     desc="언론사 분류 기준, 1차 자료 매칭 규칙, 미디어 리터러시 관점에서의 검증을 진행했습니다."
                   />
                 </div>
