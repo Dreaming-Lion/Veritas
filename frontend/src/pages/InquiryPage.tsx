@@ -88,7 +88,9 @@ const InquiryPage: React.FC = () => {
         className="w-screen min-h-screen px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30 bg-gradient-to-b from-white to-green-50 pt-12"
         style={{ paddingBottom: 0, margin: 0, width: "calc(100vw - 28px)" }}
       >
-        <div className="mx-4 sm:mx-8 md:mx-12 lg:mx-16 xl:mx-24 2xl:mx-36 flex justify-center mb-0">
+        {/* 가운데 카드 + 아래 안내 카드 같이 감싸는 컨테이너 */}
+        <div className="mx-4 sm:mx-8 md:mx-12 lg:mx-16 xl:mx-24 2xl:mx-36 flex flex-col items-center gap-4 mb-10">
+          {/* 문의 폼 카드 */}
           <div
             className="
               bg-white border border-gray-200 rounded-2xl shadow-lg
@@ -187,6 +189,25 @@ const InquiryPage: React.FC = () => {
               </button>
             </form>
           </div>
+
+          {/* 🔻 폼 카드 아래에 나오는 안내 카드 */}
+          <section
+            className="
+              w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl
+            "
+          >
+            <div className="rounded-2xl border border-green-200 bg-white px-6 py-4 text-sm text-gray-700 leading-relaxed">
+              <p className="mb-1">
+                • 문의는 보통 1~2일 이내에 답변드리며, 답변은 회원가입 시 사용하신 이메일로 전송됩니다.
+              </p>
+              <p className="mb-1">
+                • 등록된 문의의 수정 및 삭제, 답변 상태 확인은 「Inquiry List」에서 가능합니다.
+              </p>
+              <p>
+                • 개인정보(주민번호, 전화번호 등)는 문의 내용에 포함하지 않도록 주의해 주세요.
+              </p>
+            </div>
+          </section>
         </div>
       </main>
     </div>
