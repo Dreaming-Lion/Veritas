@@ -403,7 +403,8 @@ const ArticleDetailPage: React.FC = () => {
   const content = formatArticleText(data?.content ?? "") || previewExcerpt;
 
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30">
+    <div className="w-screen px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30"
+    style={{ width: "calc(100vw - 52px)" }}>
       <div className="mx-auto w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-14 max-w-[1600px] 2xl:max-w-[1920px] py-6">
         {/* 상단 헤더 */}
         <div className="mb-4">
