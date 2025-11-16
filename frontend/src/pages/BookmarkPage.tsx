@@ -135,7 +135,6 @@ const BookmarkCard: React.FC<{
       <div className="mt-auto flex items-center justify-between text-sm pt-2">
         <span className="!text-gray-500">{item.press}</span>
         <span className="!text-green-600 font-semibold group-hover:translate-x-0.5 transition">
-          {/* ✅ 메인과 동일: 해당 기사로 이동 + state 전달 */}
           <Link
             to={`/Detail/${item.id}`}
             state={{ item }}

@@ -40,8 +40,7 @@ services:
       - ./backend:/app
       - backend-gradle-cache:/home/gradle/.gradle
     command: >
-      bash -lc "gradle --no-daemon bootRun
-        -Dspring-boot.run.jvmArguments='-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005'"
+      bash -lc "gradle --no-daemon bootRun"
 
   frontend:
     image: node:20-alpine 

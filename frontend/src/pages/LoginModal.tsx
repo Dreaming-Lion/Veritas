@@ -19,7 +19,10 @@ const Icon = {
   eyeOff: <EyeOff className="w-5 h-5 text-gray-700" />,
 };
 
-const SegmentedTabs: React.FC<{ tab: Tab; setTab: (t: Tab) => void }> = ({ tab, setTab }) => (
+const SegmentedTabs: React.FC<{ tab: Tab; setTab: (t: Tab) => void }> = ({
+  tab,
+  setTab,
+}) => (
   <div className="w-full rounded-full bg-gray-100/90 border border-gray-200 p-1.5 flex">
     <button
       type="button"
@@ -59,7 +62,16 @@ const Field: React.FC<{
   value?: string;
   onChange?: (v: string) => void;
   error?: string;
-}> = ({ label, type = "text", placeholder, leftIcon, rightIconBtn, value, onChange, error }) => (
+}> = ({
+  label,
+  type = "text",
+  placeholder,
+  leftIcon,
+  rightIconBtn,
+  value,
+  onChange,
+  error,
+}) => (
   <label className="block">
     <div className="mb-1 text-sm text-gray-700">{label}</div>
     <div className="relative">
@@ -79,14 +91,20 @@ const Field: React.FC<{
         ].join(" ")}
       />
       {rightIconBtn && (
-        <span className="absolute right-3 top-1/2 -translate-y-1/2">{rightIconBtn}</span>
+        <span className="absolute right-3 top-1/2 -translate-y-1/2">
+          {rightIconBtn}
+        </span>
       )}
     </div>
     {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
   </label>
 );
 
-const LoginSignupModal: React.FC<Props> = ({ open, onClose, initialTab = "login" }) => {
+const LoginSignupModal: React.FC<Props> = ({
+  open,
+  onClose,
+  initialTab = "login",
+}) => {
   const [tab, setTab] = React.useState<Tab>(initialTab);
 
   // 로그인
@@ -104,7 +122,9 @@ const LoginSignupModal: React.FC<Props> = ({ open, onClose, initialTab = "login"
   // 상태
   const [loading, setLoading] = React.useState(false);
   const [globalError, setGlobalError] = React.useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
+  const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>(
+    {}
+  );
 
   React.useEffect(() => {
     setTab(initialTab);
@@ -112,7 +132,9 @@ const LoginSignupModal: React.FC<Props> = ({ open, onClose, initialTab = "login"
 
   React.useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
@@ -141,7 +163,6 @@ const LoginSignupModal: React.FC<Props> = ({ open, onClose, initialTab = "login"
     return Object.keys(errors).length === 0;
   };
 
-  // 이벤트 핸들러
   const onClickLogin = async () => {
     setGlobalError(null);
     if (!validateLogin()) return;
@@ -149,11 +170,7 @@ const LoginSignupModal: React.FC<Props> = ({ open, onClose, initialTab = "login"
     try {
       const data = await login({ email: loginEmail, password: loginPw });
       localStorage.setItem("access_token", data.access_token);
-
-      // ✅ 로그인 성공 시 전체 페이지 새로고침
       window.location.reload();
-      // 새로고침 대신 히스토리 교체만 원하면 아래를 사용:
-      // window.location.replace(window.location.pathname + window.location.search);
     } catch (e: any) {
       setGlobalError(e?.message ?? "로그인 실패");
     } finally {
@@ -170,9 +187,8 @@ const LoginSignupModal: React.FC<Props> = ({ open, onClose, initialTab = "login"
         name: name.trim(),
         email: email.trim(),
         password: pw,
-        password_confirm: pw2,
+        passwordConfirm: pw2, 
       });
-      // 회원가입 성공 → 로그인 탭 전환 (자동 로그인은 필요 시 추가 가능)
       setTab("login");
     } catch (e: any) {
       setGlobalError(e?.message ?? "회원가입 실패");
@@ -225,7 +241,11 @@ const LoginSignupModal: React.FC<Props> = ({ open, onClose, initialTab = "login"
                             hover:!border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
                   >
                     <span className="absolute inset-0 flex items-center justify-center">
-                      {showLoginPw ? <EyeOff className="w-5 h-5 text-gray-700" /> : <Eye className="w-5 h-5 text-gray-700" />}
+                      {showLoginPw ? (
+                        <EyeOff className="w-5 h-5 text-gray-700" />
+                      ) : (
+                        <Eye className="w-5 h-5 text-gray-700" />
+                      )}
                     </span>
                   </button>
                 }
@@ -253,7 +273,8 @@ const LoginSignupModal: React.FC<Props> = ({ open, onClose, initialTab = "login"
                 value={name}
                 onChange={(v) => {
                   setName(v);
-                  if (fieldErrors.name) setFieldErrors((e) => ({ ...e, name: "" }));
+                  if (fieldErrors.name)
+                    setFieldErrors((e) => ({ ...e, name: "" }));
                 }}
                 error={fieldErrors.name}
               />
@@ -264,7 +285,8 @@ const LoginSignupModal: React.FC<Props> = ({ open, onClose, initialTab = "login"
                 value={email}
                 onChange={(v) => {
                   setEmail(v);
-                  if (fieldErrors.email) setFieldErrors((e) => ({ ...e, email: "" }));
+                  if (fieldErrors.email)
+                    setFieldErrors((e) => ({ ...e, email: "" }));
                 }}
                 error={fieldErrors.email}
               />
@@ -276,7 +298,8 @@ const LoginSignupModal: React.FC<Props> = ({ open, onClose, initialTab = "login"
                 value={pw}
                 onChange={(v) => {
                   setPw(v);
-                  if (fieldErrors.pw) setFieldErrors((e) => ({ ...e, pw: "" }));
+                  if (fieldErrors.pw)
+                    setFieldErrors((e) => ({ ...e, pw: "" }));
                 }}
                 error={fieldErrors.pw}
               />
@@ -301,7 +324,8 @@ const LoginSignupModal: React.FC<Props> = ({ open, onClose, initialTab = "login"
                 value={pw2}
                 onChange={(v) => {
                   setPw2(v);
-                  if (fieldErrors.pw2) setFieldErrors((e) => ({ ...e, pw2: "" }));
+                  if (fieldErrors.pw2)
+                    setFieldErrors((e) => ({ ...e, pw2: "" }));
                 }}
                 error={fieldErrors.pw2}
               />
