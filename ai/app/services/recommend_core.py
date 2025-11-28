@@ -87,14 +87,6 @@ from urllib.parse import urlparse
 
 NAVER_HOSTS = {"news.naver.com", "n.news.naver.com"}
 
-def _is_naver_link(url: str) -> bool:
-    try:
-        host = urlparse(url).hostname or ""
-        return host in NAVER_HOSTS
-    except Exception:
-        return False
-
-
 def compute_recommendations(clicked_link: str,
                             hours_window: int = 48,
                             topk_return: int = 8,
@@ -110,20 +102,14 @@ def compute_recommendations(clicked_link: str,
 
         b_source, b_lean, b_title, b_text, b_date, b_link = base
 
-        # 네이버 기사만 허용
-        if not _is_naver_link(b_link):
-            return {
-                "error": "네이버 뉴스 기사에 대해서만 추천을 제공합니다.",
-                "normalized": normalize_clicked(b_link),
-            }
 
-        # TF-IDF용 - 제목 + 본문 일부(잘라서)
+        # TF-IDF용 - 제목 + 본문 일부
         premise_tfidf = f"{b_title or ''} {(b_text or '')[:1500]}".strip()
 
-        # NLI용 - 요약본 (너무 길지 않게)
+        # NLI용 - 요약본 
         premise_nli = summarize_text(b_text or b_title, ratio=0.2) or (b_title or "")
 
-        rows = _fetch_candidates(cur, b_lean, b_date, normalize_clicked(b_link), hours_window)
+        rows = _fetch_candidates(cur, b_lean, b_date, normalized, hours_window)
     finally:
         cur.close(); conn.close()
 
@@ -137,7 +123,7 @@ def compute_recommendations(clicked_link: str,
     leans  = [r[4] for r in rows]
     dates  = [r[5] for r in rows]
 
-    # TF-IDF 상위 후보 (제목 + 본문 일부)
+    # TF-IDF 상위 후보
     docs = [(t or "") + " " + ((x or "")[:1500]) for t, x in zip(titles, texts)]
     tfidf = TfidfVectorizer(min_df=2, ngram_range=(1, 2))
     try:
@@ -153,7 +139,6 @@ def compute_recommendations(clicked_link: str,
     for i in cand_idx:
         hyp = summarize_text(texts[i] or titles[i], ratio=0.2) or (titles[i] or "")
         try:
-            # 요약본 premise_nli 사용
             label, probs = nli_infer(premise_nli, hyp)
         except Exception:
             continue
@@ -187,4 +172,5 @@ def compute_recommendations(clicked_link: str,
         "clicked": normalize_clicked(b_link),
         "recommendations": picks[:topk_return]
     }
+
 

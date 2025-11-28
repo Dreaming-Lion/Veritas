@@ -11,7 +11,9 @@ type ApiArticle = {
   summary?: string | null;
   date?: string | null;
   link: string;
+  source?: string | null;
 };
+
 type BackendListResponse = { count: number; articles: ApiArticle[] };
 type ArticleEx = Article & { link: string; content?: string | null };
 
@@ -87,30 +89,43 @@ const useNowTick = (intervalMs = 60_000) => {
   }, [intervalMs]);
 };
 
-/**
- * 네이버 뉴스 링크만 필터링하는 헬퍼
- * - 절대/상대 URL 모두 처리
- * - news.naver.com, n.news.naver.com 및 하위 서브도메인 허용
- */
-const isNaverNewsLink = (rawLink?: string | null): boolean => {
-  if (!rawLink) return false;
-  const fixed = rawLink.trim().replace(/&amp;/g, "&");
+const extractSourceLabel = (a: ApiArticle): string => {
+  // 1) 백엔드에서 source 내려주면 그거 우선
+  if (a.source && a.source.trim()) {
+    return a.source.trim();
+  }
+
+  const raw = (a.link || "").replace(/&amp;/g, "&");
 
   try {
-    const u = new URL(fixed, "https://news.naver.com");
-    const host = u.hostname.toLowerCase();
+    const u = new URL(raw);
+    let host = (u.hostname || "").toLowerCase();
 
-    if (host === "news.naver.com" || host === "n.news.naver.com") return true;
-    if (host.endsWith(".news.naver.com")) return true;
+    host = host.replace(/^(www|m)\./, "");
 
-    return false;
+    const HOST_LABEL_MAP: Record<string, string> = {
+      "yonhapnewstv.co.kr": "연합뉴스",     
+      "chosun.com":"조선일보",
+      "news.sbs.co.kr":"SBS",
+      "news.jtbc.co.kr":"JTBC",
+      "mk.co.kr":"매일경제",
+      "ohmynews.com":"오마이뉴스",
+      "pressian.com":"프레시안",
+      "sisajournal.com":"시사저널",
+      "newsis.com":"뉴시스",
+      "donga.com":"동아일보",
+      "khan.co.kr":"경향신문",
+      "kmib.co.kr":"국민일보"
+    };
+
+    if (HOST_LABEL_MAP[host]) {
+      return HOST_LABEL_MAP[host];
+    }
+
+    // 매핑 안 된 건 도메인 표시
+    return host || "뉴스";
   } catch {
-    const s = fixed.toLowerCase();
-    return (
-      s.includes("news.naver.com") ||
-      s.startsWith("/mnews/") ||
-      s.startsWith("/article/")
-    );
+    return "뉴스";
   }
 };
 
@@ -183,7 +198,7 @@ const Card: React.FC<{
       </p>
 
       <div className="mt-auto flex items-center justify-between text-sm pt-2">
-        <span className="!text-gray-500">네이버 뉴스</span>
+        <span className="!text-gray-500">{item.press}</span>
         <span className="!text-green-600 font-semibold group-hover:translate-x-0.5 transition">
           자세히 보기 →
         </span>
@@ -194,7 +209,7 @@ const Card: React.FC<{
 
 type FetchPageResult = {
   mapped: ArticleEx[];
-  rawCount: number; // 서버가 준 원본 기사 개수 (필터 전)
+  rawCount: number; 
 };
 
 const MainPage: React.FC = () => {
@@ -204,39 +219,27 @@ const MainPage: React.FC = () => {
   const [loading, setLoading] = React.useState(false);
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [query, setQuery] = React.useState("");
-  const [nextOffset, setNextOffset] = React.useState(0); // DB offset (필터 전 개수 기준)
+  const [nextOffset, setNextOffset] = React.useState(0); // DB offset
   const [serverHasMore, setServerHasMore] = React.useState(true);
 
   const { isSaved, toggle } = useBookmarks();
   const { open: openAuth } = useAuthDialog();
 
-  // ✅ 네이버 뉴스만 strict 필터
   const mapArticles = (list: ApiArticle[]): ArticleEx[] => {
-    const filtered = list.filter((a) => {
-      const ok = isNaverNewsLink(a.link);
-      // 디버깅용: 필요 없으면 나중에 지워도 됨
-      console.log("[isNaverNewsLink]", a.link, "=>", ok);
-      return ok;
+    return (list ?? []).map((a) => {
+      const link = (a.link || "").replace(/&amp;/g, "&");
+      const press = extractSourceLabel(a);
+
+      return {
+        id: a.id,
+        title: cleanTitle(a.title),
+        excerpt: toExcerpt(a.summary ?? a.content),
+        time: a.date ?? "",
+        press, 
+        link,
+        content: a.content ? decodeHTMLEntities(a.content) : null,
+      };
     });
-
-    if (list.length > 0) {
-      console.log(
-        "[/article] filtered count / raw count =",
-        filtered.length,
-        "/",
-        list.length
-      );
-    }
-
-    return filtered.map((a) => ({
-      id: a.id,
-      title: cleanTitle(a.title),
-      excerpt: toExcerpt(a.summary ?? a.content),
-      time: a.date ?? "",
-      press: "네이버 뉴스",
-      link: (a.link || "").replace(/&amp;/g, "&"),
-      content: a.content ? decodeHTMLEntities(a.content) : null,
-    }));
   };
 
   const fetchPage = React.useCallback(
@@ -244,7 +247,7 @@ const MainPage: React.FC = () => {
       const res = await fetch(
         apiUrl(`/article?limit=${PAGE_SIZE}&offset=${offset}`),
         {
-        headers: { Accept: "application/json" },
+          headers: { Accept: "application/json" },
         }
       );
       if (!res.ok) throw new Error(`GET /article 실패 (status ${res.status})`);
@@ -264,7 +267,6 @@ const MainPage: React.FC = () => {
     const run = async () => {
       setLoading(true);
       try {
-        // 초기 로딩: 네이버 기준으로 최소 PAGE_SIZE개 모을 때까지 페이지 여러 번 요청
         let offset = 0;
         let acc: ArticleEx[] = [];
         let hasMore = true;
@@ -445,7 +447,7 @@ const MainPage: React.FC = () => {
         <div className="text-sm text-gray-500">불러오는 중…</div>
       ) : items.length === 0 ? (
         <div className="text-sm text-gray-500">
-          표시할 네이버 뉴스가 없습니다.
+          표시할 뉴스가 없습니다.
         </div>
       ) : (
         <>

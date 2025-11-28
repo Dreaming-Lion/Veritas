@@ -49,7 +49,7 @@ except Exception:
 
 def _fetch_recent_links(lookback_hours: int, max_items: int) -> List[str]:
     """
-    최근 lookback_hours 동안 들어온 네이버 뉴스 기사 링크를 최신순으로 가져온다.
+    최근 lookback_hours 동안 들어온 모든 RSS 뉴스 기사 링크를 최신순으로 가져옴
     """
     conn = get_conn(); cur = conn.cursor()
     try:
@@ -61,14 +61,11 @@ def _fetch_recent_links(lookback_hours: int, max_items: int) -> List[str]:
             WHERE link IS NOT NULL
               AND link <> ''
               AND date >= %s
-              AND (link LIKE %s OR link LIKE %s)
             ORDER BY date DESC NULLS LAST, id DESC
             LIMIT %s;
             """,
             (
                 since,
-                "https://news.naver.com/%",
-                "https://n.news.naver.com/%",
                 max_items,
             ),
         )
@@ -76,6 +73,7 @@ def _fetch_recent_links(lookback_hours: int, max_items: int) -> List[str]:
         return [r[0] for r in rows if r and r[0]]
     finally:
         cur.close(); conn.close()
+
 
 def _safe_json(payload: dict) -> dict:
     """

@@ -2,14 +2,11 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 import os
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
-
-from app.api.crawl import crawl_news, router as crawl_router, init_db
+from app.api.crawl import init_db, router as article_router
 from app.api.rss_crawl import crawl_rss, router as rss_router
-from app.api.crawl import router as article_router
 from app.api.summary import router as summary_router, run_summary_after_crawl
 from app.services.recommend_batch import precompute_recent
 from app.model.model import load_model
@@ -36,10 +33,14 @@ scheduler = BackgroundScheduler(timezone="UTC")
 
 
 def job_crawl_all():
-    print("[job_crawl_all] 네이버 뉴스 크롤링 시작")
+    """
+    정기 크롤링:
+      - RSS 뉴스 크롤링
+      - 요약 작업
+      - 추천 사전계산
+    """
+    print("[job_crawl_all] RSS 뉴스 크롤링 시작")
     try:
-        crawl_news()
-        print("[job_crawl_all] RSS 뉴스 크롤링 시작")
         crawl_rss()
     finally:
         print("[job_crawl_all] 요약 작업 시작")
@@ -90,7 +91,7 @@ def bootstrap_heavy_jobs():
     print("[bootstrap] heavy bootstrap start")
     try:
         if BOOTSTRAP_DO_CRAWL:
-            print("[bootstrap] 초기 크롤 + 요약 + 추천(job_crawl_all) 실행")
+            print("[bootstrap] 초기 RSS 크롤 + 요약 + 추천(job_crawl_all) 실행")
             job_crawl_all()
         else:
             print("[bootstrap] 초기 크롤 생략(BOOTSTRAP_DO_CRAWL=0)")
@@ -139,7 +140,6 @@ async def lifespan(app: FastAPI):
 app.router.lifespan_context = lifespan
 
 
-
 @app.get("/")
 async def root():
     return {"message": "Veritas API에 오신 것을 환영합니다!"}
@@ -149,7 +149,6 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
-app.include_router(crawl_router,   prefix="/api")
 app.include_router(rss_router,     prefix="/api")
 app.include_router(article_router, prefix="/api")
 app.include_router(summary_router, prefix="/api")
