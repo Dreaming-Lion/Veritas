@@ -258,25 +258,20 @@ def compute_recommendations(clicked_link: str,
     for i in cand_idx:
         hyp = summarize_text(texts[i] or titles[i], ratio=0.2) or (titles[i] or "")
         try:
-            # 요약된 premise_nli vs hyp로 NLI 추론
             label, probs = nli_infer(premise_nli, hyp)
         except Exception:
-            continue
+            # NLI 실패하면 그냥 TF-IDF 점수만으로라도 후보에 포함
+            eprob = nprob = cprob = 0.0
+        else:
+            eprob, nprob, cprob = float(probs[0]), float(probs[1]), float(probs[2])
 
-        eprob, nprob, cprob = float(probs[0]), float(probs[1]), float(probs[2])
         stance = cprob - eprob  # [-1, 1]
 
-        # NLI에서 '충돌(contradiction) - 함의(entailment)' 차이가 임계치 이하이면 버림
-        if stance < stance_threshold:
-            continue
+        # [0,1]로 정규화 (음수면 0으로)
+        stance_norm = max(0.0, min(1.0, (stance + 1.0) / 2.0))
 
-        # stance를 [0, 1]로 정규화
-        denom = max(1e-6, 1.0 - stance_threshold)
-        stance_norm = (stance - stance_threshold) / denom
-        stance_norm = 0.0 if stance_norm < 0 else (1.0 if stance_norm > 1 else stance_norm)
-
-        # TF-IDF 유사도와 stance를 합성해 스코어 계산
-        base_w, gain_w = 0.6, 0.4
+        # TF-IDF 유사도에 stance를 살짝 가중치로 얹기
+        base_w, gain_w = 0.8, 0.2  # TF-IDF 비중을 더 크게
         score = float(sims[i]) * (base_w + gain_w * stance_norm)
 
         out_link = normalize_variant_urls(strip_tracking_params(links[i]))
@@ -288,11 +283,11 @@ def compute_recommendations(clicked_link: str,
             date=dates[i],
             probs={"entailment": eprob, "neutral": nprob, "contradiction": cprob},
             stance=stance,
-            score=score
+            score=score,
         ))
 
     picks.sort(key=lambda x: x["score"], reverse=True)
     return {
         "clicked": normalize_clicked(b_link),
-        "recommendations": picks[:topk_return]
+        "recommendations": picks[:topk_return],
     }
