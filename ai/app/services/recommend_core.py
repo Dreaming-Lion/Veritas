@@ -260,7 +260,6 @@ def compute_recommendations(clicked_link: str,
         try:
             label, probs = nli_infer(premise_nli, hyp)
         except Exception:
-            # NLI 실패하면 그냥 TF-IDF 점수만으로라도 후보에 포함
             eprob = nprob = cprob = 0.0
         else:
             eprob, nprob, cprob = float(probs[0]), float(probs[1]), float(probs[2])
