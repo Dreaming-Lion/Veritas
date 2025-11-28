@@ -115,7 +115,9 @@ const extractSourceLabel = (a: ApiArticle): string => {
       "newsis.com":"뉴시스",
       "donga.com":"동아일보",
       "khan.co.kr":"경향신문",
-      "kmib.co.kr":"국민일보"
+      "kmib.co.kr":"국민일보",
+      "hani.co.kr":"한겨레",
+      "seoul.co.kr":"서울신문"
     };
 
     if (HOST_LABEL_MAP[host]) {
