@@ -43,8 +43,10 @@ def _extract_from_rss_entry(entry):
         raw = contents[0]
     else:
         raw = entry.get("summary") or entry.get("description") or ""
+    # HTML 엔티티 제거 + 태그 제거
     raw = html.unescape(raw or "")
     txt = re.sub(r"<.*?>", " ", raw, flags=re.S).strip()
+    txt = re.sub(r"\s+", " ", txt)
     return txt
 
 def _polite_fetch(url, timeout=12.0):
@@ -90,7 +92,9 @@ def _extract_full(url: str):
         html_doc = _polite_fetch(url)
         time.sleep(0.8)
         text = tr_extract(html_doc, url=url, include_comments=False, include_tables=False) or ""
-        text = text.strip()
+        # trafilatura 텍스트도 정리
+        text = html.unescape(text).strip()
+        text = re.sub(r"\s+", " ", text)
         canon = _canonicalize_url(url, html_doc)
         return text, canon
     except Exception:
@@ -106,6 +110,7 @@ def _upsert(row: dict) -> bool:
     VALUES (%(source)s, %(lean)s, %(title)s, %(summary)s, %(content)s, %(link)s, %(date)s, %(author)s, %(section)s, 'rss')
     ON CONFLICT (link) DO UPDATE SET
       title   = EXCLUDED.title,
+      -- EXCLUDED.summary가 ''이면 기존 summary 유지
       summary = COALESCE(NULLIF(EXCLUDED.summary,''), news.summary),
       content = CASE WHEN COALESCE(LENGTH(news.content),0) < COALESCE(LENGTH(EXCLUDED.content),0)
                      THEN EXCLUDED.content ELSE news.content END,
@@ -135,6 +140,7 @@ def crawl_one_feed(source_name: str, feed_url: str) -> Dict[str, Any]:
     for e in d.entries:
         raw_link = e.link
         title = (e.title or "").strip()
+        title = html.unescape(title)
         date = _parse_date(e)
         author = getattr(e, "author", None)
         section = "politics"
@@ -142,13 +148,15 @@ def crawl_one_feed(source_name: str, feed_url: str) -> Dict[str, Any]:
 
         rss_text = _extract_from_rss_entry(e)
         fulltext, canon_link = _extract_full(raw_link)
+
+        # fulltext가 더 길면 그걸 content로, 아니면 rss_text 사용
         content = fulltext if len(fulltext) >= len(rss_text) else rss_text
 
         row = dict(
             source=source_name,
             lean=lean,
             title=title,
-            summary=rss_text,
+            summary="",       
             content=content,
             link=canon_link,
             date=date,

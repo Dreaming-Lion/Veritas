@@ -1,4 +1,3 @@
-# main.py
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 import os
@@ -33,18 +32,12 @@ scheduler = BackgroundScheduler(timezone="UTC")
 
 
 def job_crawl_all():
-    """
-    정기 크롤링:
-      - RSS 뉴스 크롤링
-      - 요약 작업
-      - 추천 사전계산
-    """
     print("[job_crawl_all] RSS 뉴스 크롤링 시작")
     try:
         crawl_rss()
     finally:
         print("[job_crawl_all] 요약 작업 시작")
-        run_summary_after_crawl(limit=SUMMARY_LIMIT_AFTER_CRAWL)
+        run_summary_after_crawl(limit=SUMMARY_LIMIT_AFTER_CRAWL, force=True)
 
         print(f"[job_crawl_all] 추천 사전계산 시작(24h/최대400)")
         precompute_recent(lookback_hours=24, max_items=400)
@@ -52,9 +45,6 @@ def job_crawl_all():
 
 
 def job_reco_periodic():
-    """
-    최근 72시간 기준으로 추천 캐시 리프레시
-    """
     print("[job_reco_periodic] 주기적 추천 사전 계산(72h/최대600)")
     precompute_recent(lookback_hours=72, max_items=600)
 

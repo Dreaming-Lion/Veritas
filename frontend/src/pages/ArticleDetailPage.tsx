@@ -212,7 +212,7 @@ const ArticleDetailPage: React.FC = () => {
   const [oppList, setOppList] = React.useState<OppCard[]>([]);
   const [oppLoading, setOppLoading] = React.useState<boolean>(false);
 
-  /* ---------------------- 기사 본문/메타/요약 ---------------------- */
+  /* ---------------------- 기사 본문 ---------------------- */
   React.useEffect(() => {
     let mounted = true;
     (async () => {
@@ -243,6 +243,7 @@ const ArticleDetailPage: React.FC = () => {
     };
   }, [paramId, previewLink]);
 
+  /* ---------------------- 메타 정보 ---------------------- */
   React.useEffect(() => {
     let mounted = true;
     (async () => {
@@ -270,6 +271,7 @@ const ArticleDetailPage: React.FC = () => {
     };
   }, [paramId, previewLink]);
 
+  /* ---------------------- 요약 호출 (무조건 2~3문장만) ---------------------- */
   React.useEffect(() => {
     let mounted = true;
     (async () => {
@@ -279,23 +281,40 @@ const ArticleDetailPage: React.FC = () => {
 
         let res = await fetch(`${API_BASE}/article/${paramId}/summary?strict=false`);
         if (!res.ok && previewLink) {
-          res = await fetch(`${API_BASE}/article/summary/by-link?link=${encodeURIComponent(previewLink)}&strict=false`);
+          res = await fetch(
+            `${API_BASE}/article/summary/by-link?link=${encodeURIComponent(previewLink)}&strict=false`
+          );
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
         const json: SummaryResponse = await res.json();
-        const s = formatArticleText(json?.summary ?? "").trim();
+
+        // 🔹 서버 summary를 받아도, 항상 앞에서 2~3문장으로 잘라서 사용
+        const serverSummaryRaw = formatArticleText(json?.summary ?? "");
+        const clipped = firstSentences(
+          serverSummaryRaw || data?.content || preview?.excerpt || "",
+          3, // 최대 3문장
+        );
+
         if (!mounted) return;
 
-        if (s) {
-          setSummary(s);
+        if (clipped) {
+          setSummary(clipped);
         } else {
-          const fallback = firstSentences(data?.content ?? "", 2) || firstSentences(preview?.excerpt ?? "", 2);
+          // 서버 요약이 비거나 이상할 때 content/excerpt에서 fallback
+          const fallback =
+            firstSentences(data?.content ?? "", 3) ||
+            firstSentences(preview?.excerpt ?? "", 3);
           setSummary(fallback || null);
         }
       } catch (e: any) {
         if (!mounted) return;
         setSummaryErr(e?.message ?? "summary load failed");
-        const fallback = firstSentences(data?.content ?? "", 2) || firstSentences(preview?.excerpt ?? "", 2);
+
+        // 에러가 나도 content/excerpt에서 앞 2~3문장 fallback
+        const fallback =
+          firstSentences(data?.content ?? "", 3) ||
+          firstSentences(preview?.excerpt ?? "", 3);
         setSummary(fallback || null);
       } finally {
         if (mounted) setSummaryLoading(false);
@@ -320,7 +339,9 @@ const ArticleDetailPage: React.FC = () => {
     setOppLoading(true);
     setOppList([]);
 
-    const qs = `clicked_link=${encodeURIComponent(clickedUrlMaybe)}&hours_window=${RECO.HOURS_WINDOW}&topk_return=${RECO.TOPK}&nli_threshold=${RECO.NLI_THRESHOLD}&allow_stale=true`;
+    const qs = `clicked_link=${encodeURIComponent(
+      clickedUrlMaybe
+    )}&hours_window=${RECO.HOURS_WINDOW}&topk_return=${RECO.TOPK}&nli_threshold=${RECO.NLI_THRESHOLD}&allow_stale=true`;
     const endpoints = [
       `${API_BASE}/article/recommend?${qs}`,
       `${API_BASE}/recommend?${qs}`,
@@ -386,7 +407,6 @@ const ArticleDetailPage: React.FC = () => {
     setOppLoading(false);
   }, [clickedUrlMaybe]);
 
-  // ✅ 페이지 진입/기사 전환 시 자동으로 라이브 추천 실행
   React.useEffect(() => {
     if (clickedUrlMaybe) {
       manualFetchLive();
@@ -403,8 +423,10 @@ const ArticleDetailPage: React.FC = () => {
   const content = formatArticleText(data?.content ?? "") || previewExcerpt;
 
   return (
-    <div className="w-screen px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30"
-    style={{ width: "calc(100vw - 52px)" }}>
+    <div
+      className="w-screen px-4 sm:px-6 lg:px-8 xl:px-14 2xl:px-30"
+      style={{ width: "calc(100vw - 52px)" }}
+    >
       <div className="mx-auto w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-14 max-w-[1600px] 2xl:max-w-[1920px] py-6">
         {/* 상단 헤더 */}
         <div className="mb-4">
@@ -467,10 +489,7 @@ const ArticleDetailPage: React.FC = () => {
 
             {/* 반대 의견 뉴스 (추천 3건) */}
             <Card interactive>
-              <SectionHeader
-                icon={<span className="text-orange-600">{Icon.alert}</span>}
-                title="반대 의견 뉴스"
-              />
+              <SectionHeader icon={<span className="text-orange-600">{Icon.alert}</span>} title="반대 의견 뉴스" />
               <div className="p-4">
                 {oppLoading ? (
                   <div className="space-y-2">
