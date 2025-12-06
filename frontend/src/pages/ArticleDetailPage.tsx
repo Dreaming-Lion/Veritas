@@ -367,7 +367,6 @@ const ArticleDetailPage: React.FC = () => {
       return;
     }
 
-    const controller = new AbortController();
     const top3 = (r.recommendations || [])
       .slice()
       .filter((x: any) => (x?.score ?? 0) >= 0.1)
@@ -378,20 +377,30 @@ const ArticleDetailPage: React.FC = () => {
       top3.map(async (it) => {
         const url = (it.link || "").replace(/&amp;/g, "&");
         let sum = "";
+
+        // 🔹 반대 기사 요약: API + fallback
         try {
           const sres = await fetch(
-            `${API_BASE}/article/summary/by-link?link=${encodeURIComponent(url)}&strict=false`,
-            { signal: controller.signal }
+            `${API_BASE}/article/summary/by-link?link=${encodeURIComponent(url)}&strict=false`
           );
           if (sres.ok) {
             const sj: SummaryResponse = await sres.json();
-            sum = firstSentences(sj?.summary ?? "", 2);
+            const raw = sj?.summary ?? "";
+            // 서버 요약이 길어도 항상 1~2문장만 사용
+            sum = firstSentences(raw, 2);
           }
         } catch {
           /* ignore */
         }
+
+        // summary API가 비었거나 실패했을 때: 제목 기반 한 줄 요약 fallback
+        if (!sum) {
+          sum = firstSentences(it.title ?? "", 1);
+        }
+
         const press = it.source || hostToPress(url) || "언론사";
         const s = Number(it.score ?? 0);
+
         return {
           title: cleanTitle(it.title),
           url,
@@ -515,7 +524,11 @@ const ArticleDetailPage: React.FC = () => {
                             </span>
                           </div>
                           <p className="mt-1 font-semibold text-orange-900">{it.title}</p>
-                          {it.summary && <p className="mt-1 text-sm text-orange-800/90">{it.summary}</p>}
+                          {it.summary && (
+                            <p className="mt-1 text-sm text-orange-800/90">
+                              {it.summary}
+                            </p>
+                          )}
                         </div>
                       </a>
                     ))}

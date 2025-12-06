@@ -45,10 +45,37 @@ const cleanTitle = (t?: string | null): string => {
   return s;
 };
 
-const toExcerpt = (raw?: string | null): string => {
-  const base = decodeHTMLEntities(raw).replace(/\s+/g, " ").trim();
+// 본문/요약 텍스트 정리
+const normalizeBodyText = (raw?: string | null): string => {
+  if (!raw) return "";
+  let t = decodeHTMLEntities(raw);
+  t = t.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  t = t.replace(/\\n/g, "\n").replace(/\\t/g, "  ");
+  t = t.replace(/\u00a0/g, " ");
+  t = t.replace(/\s+/g, " ");
+  return t.trim();
+};
+
+// 앞에서 N문장만 추출
+const firstSentences = (text: string, max = 2): string => {
+  const t = normalizeBodyText(text);
+  if (!t) return "";
+  const bits = t
+    .split(/(?<=[\.!?]|…|”|\"|다\.|요\.)\s+/g)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  return bits.slice(0, Math.max(1, max)).join(" ");
+};
+
+const toExcerpt = (summary?: string | null, content?: string | null): string => {
+  const base = normalizeBodyText(summary) || normalizeBodyText(content);
   if (!base) return "본문 미리보기가 없습니다.";
-  return base.length > 50 ? base.slice(0, 50) + "…" : base;
+
+  const sent = firstSentences(base, 2);
+  if (!sent) return "본문 미리보기가 없습니다.";
+
+  // 너무 길면 살짝 자르기
+  return sent.length > 90 ? sent.slice(0, 90) + "…" : sent;
 };
 
 const formatRelativeKorean = (iso?: string | null): string => {
@@ -104,20 +131,20 @@ const extractSourceLabel = (a: ApiArticle): string => {
     host = host.replace(/^(www|m)\./, "");
 
     const HOST_LABEL_MAP: Record<string, string> = {
-      "yonhapnewstv.co.kr": "연합뉴스",     
-      "chosun.com":"조선일보",
-      "news.sbs.co.kr":"SBS",
-      "news.jtbc.co.kr":"JTBC",
-      "mk.co.kr":"매일경제",
-      "ohmynews.com":"오마이뉴스",
-      "pressian.com":"프레시안",
-      "sisajournal.com":"시사저널",
-      "newsis.com":"뉴시스",
-      "donga.com":"동아일보",
-      "khan.co.kr":"경향신문",
-      "kmib.co.kr":"국민일보",
-      "hani.co.kr":"한겨레",
-      "seoul.co.kr":"서울신문"
+      "yonhapnewstv.co.kr": "연합뉴스",
+      "chosun.com": "조선일보",
+      "news.sbs.co.kr": "SBS",
+      "news.jtbc.co.kr": "JTBC",
+      "mk.co.kr": "매일경제",
+      "ohmynews.com": "오마이뉴스",
+      "pressian.com": "프레시안",
+      "sisajournal.com": "시사저널",
+      "newsis.com": "뉴시스",
+      "donga.com": "동아일보",
+      "khan.co.kr": "경향신문",
+      "kmib.co.kr": "국민일보",
+      "hani.co.kr": "한겨레",
+      "seoul.co.kr": "서울신문",
     };
 
     if (HOST_LABEL_MAP[host]) {
@@ -211,7 +238,7 @@ const Card: React.FC<{
 
 type FetchPageResult = {
   mapped: ArticleEx[];
-  rawCount: number; 
+  rawCount: number;
 };
 
 const MainPage: React.FC = () => {
@@ -235,11 +262,11 @@ const MainPage: React.FC = () => {
       return {
         id: a.id,
         title: cleanTitle(a.title),
-        excerpt: toExcerpt(a.summary ?? a.content),
+        excerpt: toExcerpt(a.summary, a.content),
         time: a.date ?? "",
-        press, 
+        press,
         link,
-        content: a.content ? decodeHTMLEntities(a.content) : null,
+        content: a.content ? normalizeBodyText(a.content) : null,
       };
     });
   };

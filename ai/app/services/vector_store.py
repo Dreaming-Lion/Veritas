@@ -46,10 +46,9 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
 
     batch_size 로 Qdrant upsert를 쪼개서 타임아웃/메모리 부담을 줄인다.
 
-    ⚠️ 매번 호출 시 Qdrant 컬렉션(news_tfidf)을 dim에 맞게 recreate_collection으로
+    매번 호출 시 Qdrant 컬렉션(news_tfidf)을 dim에 맞게 recreate_collection으로
        '항상' 새로 만든다. (dim 꼬임 방지)
     """
-    # 순환 import 피하려고 함수 안에서 import
     from app.services.recommend_core import get_conn
 
     t_global_start = time.time()
@@ -109,7 +108,6 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
         step2_time,
     )
 
-    # 🔥 매번 컬렉션을 dim에 맞게 새로 생성 (dim 꼬임 방지)
     logger.info(
         "[vector_store] 컬렉션 %s 를 dim=%d 로 recreate_collection 합니다.",
         COLLECTION,
