@@ -167,8 +167,6 @@ def _fetch_base(cur, clicked_link: str):
     return base, normalized
 
 
-from app.services.vector_store import search_similar_with_lean_fallback
-
 
 def compute_recommendations(
     clicked_link: str,
@@ -188,6 +186,8 @@ def compute_recommendations(
     4) 후보들에 대해 mDeBERTa XNLI NLI 모델로 stance 계산
     5) stance + TF-IDF(Cosine) 기반 스코어로 정렬 후 상위 topk_return개 추천
     """
+    from app.services.vector_store import search_similar_with_lean_fallback
+    
     conn = get_conn()
     cur = conn.cursor()
     try:

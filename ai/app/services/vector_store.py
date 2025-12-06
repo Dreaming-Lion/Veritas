@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Any
 from datetime import timezone
 import logging
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
 
 import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -22,14 +22,13 @@ from qdrant_client.http.models import (
     MatchValue,
 )
 
-from app.services.recommend_core import get_conn
-
 logger = logging.getLogger(__name__)
 
 VECTORIZER_PATH = Path("models/tfidf_news.pkl")
 
-QDRANT_HOST = "Veritas-qdrant"
-QDRANT_PORT = 6333
+# Docker 환경 변수 기반으로 Qdrant 접속
+QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant")
+QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
 COLLECTION = "news_tfidf"
 
 client = QdrantClient(
@@ -41,9 +40,10 @@ client = QdrantClient(
 
 def _ensure_collection(dim: int):
     """
-    Qdrant 컬렉션이 없으면 생성,
-    있으면 dim 확인 후 다르면 recreate_collection 으로 갈아엎기.
-    (TF-IDF 다시 학습할 때마다 차원 달라질 수 있으니 안전하게 처리)
+    Qdrant 컬렉션을 dim에 맞게 맞춰줌.
+    - 없으면 새로 생성
+    - 있으면 dim 확인 후 다르면 recreate_collection()으로 갈아엎기
+      (TF-IDF 재학습 시 dim 달라질 수 있으므로 안전하게)
     """
     collections = client.get_collections().collections
     names = {c.name for c in collections}
@@ -65,7 +65,8 @@ def _ensure_collection(dim: int):
 
     info = client.get_collection(COLLECTION)
     vectors_cfg = info.config.params.vectors
-    
+
+    # 단일 벡터 설정 / 다중 벡터 설정 모두 대응
     if isinstance(vectors_cfg, VectorParams):
         existing_dim = vectors_cfg.size
     else:
@@ -100,9 +101,11 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
       1) TF-IDF vectorizer 학습 및 디스크 저장
       2) Qdrant에 벡터 + 메타데이터 '배치 업서트'
 
-    - TF-IDF는 한 번에 학습
-    - Qdrant upsert는 ThreadPoolExecutor 로 병렬 처리 (I/O 바운드)
+    batch_size 로 Qdrant upsert를 쪼개서 타임아웃/메모리 부담을 줄인다.
     """
+    # 순환 import 피하려고 함수 안에서 import
+    from app.services.recommend_core import get_conn
+
     t_global_start = time.time()
 
     logger.info("[vector_store] step1: news 전체 SELECT 시작")
@@ -160,6 +163,7 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
         step2_time,
     )
 
+    # 컬렉션 dim 맞추기 (필요시 재생성)
     _ensure_collection(dim)
 
     total = len(ids)
@@ -169,7 +173,17 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
         batch_size,
     )
 
-    def _build_points_for_range_and_upsert(start: int, end: int) -> int:
+    indexed = 0
+
+    for start in range(0, total, batch_size):
+        end = min(start + batch_size, total)
+        logger.info(
+            "[vector_store] step3: upsert batch %d ~ %d / %d",
+            start + 1,
+            end,
+            total,
+        )
+
         X_batch = X[start:end].toarray().tolist()
         points: List[PointStruct] = []
 
@@ -208,47 +222,27 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
             }
             points.append(PointStruct(id=int(doc_id), vector=vec, payload=payload))
 
-        client.upsert(collection_name=COLLECTION, points=points)
-
         logger.info(
-            "[vector_store] step3: (done) upsert batch %d ~ %d (count=%d)",
+            "[vector_store] step3: calling client.upsert() for batch %d ~ %d (count=%d)",
             start + 1,
             end,
             len(points),
         )
-        return len(points)
+        try:
+            client.upsert(collection_name=COLLECTION, points=points)
+        except Exception as e:
+            import traceback
+            logger.error("[vector_store] Qdrant upsert 실패 (batch %d ~ %d): %r", start + 1, end, e)
+            traceback.print_exc()
+            raise
+        indexed += len(points)
+        logger.info(
+            "[vector_store] step3: done upsert batch %d ~ %d (누적 indexed=%d)",
+            start + 1,
+            end,
+            indexed,
+        )
 
-    batch_ranges = list(range(0, total, batch_size))
-    if not batch_ranges:
-        logger.info("[vector_store] 인덱싱 대상 없음")
-        return {"indexed": 0}
-
-    max_workers = min(4, len(batch_ranges))  
-    logger.info(
-        "[vector_store] step3: ThreadPoolExecutor 시작 (max_workers=%d, batches=%d)",
-        max_workers,
-        len(batch_ranges),
-    )
-
-    indexed = 0
-    with ThreadPoolExecutor(max_workers=max_workers) as ex:
-        futures = []
-        for start in batch_ranges:
-            end = min(start + batch_size, total)
-            logger.info(
-                "[vector_store] step3: (enqueue) upsert batch %d ~ %d / %d",
-                start + 1,
-                end,
-                total,
-            )
-            futures.append(ex.submit(_build_points_for_range_and_upsert, start, end))
-
-        for f in as_completed(futures):
-            try:
-                n = f.result()
-                indexed += n
-            except Exception as e:
-                logger.exception("[vector_store] 배치 업서트 실패: %s", e)
 
     total_time = time.time() - t_global_start
     logger.info(
@@ -257,6 +251,7 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
         total_time,
     )
 
+    # Qdrant 컬렉션 실제 포인트 개수도 한 번 찍기
     try:
         count_res = client.count(collection_name=COLLECTION, exact=True)
         logger.info(
@@ -271,6 +266,10 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
 
 
 def load_vectorizer() -> TfidfVectorizer:
+    """
+    디스크에서 TF-IDF vectorizer 로드.
+    없으면 에러 발생 (먼저 train_vectorizer_and_index_all 실행 필요).
+    """
     if not VECTORIZER_PATH.exists():
         raise RuntimeError(
             "TF-IDF vectorizer not found. "
@@ -280,6 +279,9 @@ def load_vectorizer() -> TfidfVectorizer:
 
 
 def _opposite_lean_values(base: Optional[str]) -> List[str]:
+    """
+    기준 lean에 따라 '반대편' 성향 리스트를 반환
+    """
     if base == "progressive":
         return ["conservative"]
     if base == "conservative":
@@ -297,10 +299,19 @@ def search_similar_with_lean_fallback(
     hours_window: int,
     top_k: int = 50,
 ):
+    """
+    TF-IDF 쿼리 벡터 기반으로 Qdrant에서 유사 기사 검색.
+
+    1) base_date 기준 시간창(hours_window) 안에서 먼저 필터링
+    2) 기준 기사 정치 성향(base_lean)의 '반대편' lean만 우선 검색
+       - 반대 lean 결과가 하나도 없으면 lean 제한 없이 전체 검색
+    """
     tfidf = load_vectorizer()
     q_vec = tfidf.transform([query_text]).toarray()[0].tolist()
 
     must_conditions: List[FieldCondition] = []
+
+    # 시간 필터 (date_ts 범위)
     if base_date is not None:
         dt_utc = base_date
         if dt_utc.tzinfo is None:
@@ -316,6 +327,7 @@ def search_similar_with_lean_fallback(
             )
         )
 
+    # 1) 먼저 반대 lean만 대상으로 검색 시도
     opp_leans = _opposite_lean_values(base_lean)
     if opp_leans:
         lean_conds = [
@@ -338,6 +350,7 @@ def search_similar_with_lean_fallback(
         if hits:
             return hits
 
+    # 2) 반대 lean 결과가 없으면 lean 제한 없이 전체 검색
     flt_all = Filter(must=must_conditions) if must_conditions else None
     res_all = client.query_points(
         collection_name=COLLECTION,
