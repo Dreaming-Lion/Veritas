@@ -18,7 +18,7 @@ from app.services.recommend_batch import build_full_tfidf_index
 BOOTSTRAP_DO_CRAWL   = os.getenv("BOOTSTRAP_DO_CRAWL", "1") == "1"
 BOOTSTRAP_LOOKBACK_H = int(os.getenv("BOOTSTRAP_LOOKBACK_H", "720"))
 BOOTSTRAP_MAX_ITEMS  = int(os.getenv("BOOTSTRAP_MAX_ITEMS", "1000"))
-SUMMARY_LIMIT_AFTER_CRAWL = int(os.getenv("SUMMARY_LIMIT_AFTER_CRAWL", "1000"))
+SUMMARY_LIMIT_AFTER_CRAWL = int(os.getenv("SUMMARY_LIMIT_AFTER_CRAWL", "60000"))
 QUICK_BOOT = os.getenv("QUICK_BOOT", "1") == "1"
 
 app = FastAPI(title="Veritas AI", version="0.1.0")
