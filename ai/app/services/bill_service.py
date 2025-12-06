@@ -68,8 +68,8 @@ async def _fetch_bills_page(
 
 async def fetch_bills_around(
     article_dt: datetime,
-    days_before: int = 30,
-    days_after: int = 7,
+    days_before: int = 365,
+    days_after: int = 365,
     max_pages: int = 5,
     page_size: int = 200,
 ) -> List[BillDoc]:
