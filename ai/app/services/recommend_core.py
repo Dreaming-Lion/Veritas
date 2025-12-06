@@ -2,10 +2,7 @@
 from __future__ import annotations
 
 import psycopg2
-from datetime import timedelta
-from typing import Optional, Tuple
-
-from sklearn.feature_extraction.text import TfidfVectorizer  # 여전히 summarize용에 필요하면 유지
+from typing import Optional
 
 from app.model.model import nli_infer
 from app.utils.url_normalize import (
@@ -14,7 +11,6 @@ from app.utils.url_normalize import (
     normalize_variant_urls,
 )
 from summa import summarizer
-
 from urllib.parse import urlparse
 
 DBCFG = dict(host="Veritas-db", dbname="appdb", user="appuser", password="apppw")
@@ -24,7 +20,7 @@ def get_conn():
     return psycopg2.connect(**DBCFG)
 
 
-def summarize_text(text: str, ratio=0.2, hard_cap=1200):
+def summarize_text(text: str, ratio=0.2, hard_cap=600):
     text = (text or "").strip()
     if not text:
         return text
@@ -59,10 +55,6 @@ LEAN_MAP = {
 
 
 def _infer_source_name(source: str | None, link: str | None) -> str | None:
-    """
-    DB에 저장된 source가 없으면 URL host를 기반으로 언론사 이름을 추정.
-    - RSS_FEEDS 에서 사용 중인 도메인 패턴 기준으로 매핑
-    """
     if source and source.strip():
         return source.strip()
 
@@ -110,11 +102,6 @@ def _infer_source_name(source: str | None, link: str | None) -> str | None:
 
 
 def _infer_lean(source: str | None, link: str | None, db_lean: str | None) -> str | None:
-    """
-    우선순위:
-      1) news.lean (DB에 이미 저장돼 있으면 그대로 사용)
-      2) news.source + URL host 기반으로 LEAN_MAP에서 추론
-    """
     if db_lean:
         return db_lean
 
@@ -126,11 +113,6 @@ def _infer_lean(source: str | None, link: str | None, db_lean: str | None) -> st
 
 
 def _is_opposite_lean(base: str, cand: str) -> bool:
-    """
-    base 기사와 cand 기사의 정치 성향이 '반대'인지 판별.
-    - progressive <-> conservative
-    - centrist 는 진보/보수 모두와 대비되는 기사로 취급
-    """
     if base == "progressive" and cand == "conservative":
         return True
     if base == "conservative" and cand == "progressive":
@@ -142,13 +124,18 @@ def _is_opposite_lean(base: str, cand: str) -> bool:
 
 def _fetch_base(cur, clicked_link: str):
     """
-    사용자가 클릭한 링크 기준으로 기준 기사 1건 조회.
-    - normalizer를 한 번 적용한 URL, 원본 URL 모두 시도
+    기준 기사 1건 조회.
+    - summary 우선, 없으면 content
     """
     normalized = normalize_clicked(clicked_link)
     cur.execute(
         """
-        SELECT source, lean, title, COALESCE(content, summary, ''), date, link
+        SELECT source,
+               lean,
+               title,
+               COALESCE(summary, content, '') AS text_for_vector,
+               date,
+               link
         FROM news WHERE link = %s;
         """,
         (normalized,),
@@ -157,7 +144,12 @@ def _fetch_base(cur, clicked_link: str):
     if not base and normalized != clicked_link:
         cur.execute(
             """
-            SELECT source, lean, title, COALESCE(content, summary, ''), date, link
+            SELECT source,
+                   lean,
+                   title,
+                   COALESCE(summary, content, '') AS text_for_vector,
+                   date,
+                   link
             FROM news WHERE link = %s;
             """,
             (clicked_link,),
@@ -167,7 +159,6 @@ def _fetch_base(cur, clicked_link: str):
     return base, normalized
 
 
-
 def compute_recommendations(
     clicked_link: str,
     hours_window: int = 48,
@@ -175,19 +166,14 @@ def compute_recommendations(
     stance_threshold: float = 0.15,
 ):
     """
-    벡터DB(Qdrant) 기반 추천 버전.
+    벡터DB(Qdrant) 기반 반대 의견 추천.
 
-    1) 사용자가 클릭한 기사(기준 기사)를 찾고, 그 정치 성향(lean)을 추론
-    2) 기준 기사 텍스트를 TF-IDF 쿼리 벡터로 만들고
-    3) Qdrant에서 '시간창 + (가능하면) 반대 lean' 조건으로 유사 기사 Top-K 검색
-       - search_similar_with_lean_fallback 안에서:
-         - 반대 lean만 우선 시도
-         - 없으면 lean 제한 없이 전체에서 검색
-    4) 후보들에 대해 mDeBERTa XNLI NLI 모델로 stance 계산
-    5) stance + TF-IDF(Cosine) 기반 스코어로 정렬 후 상위 topk_return개 추천
+    - TF-IDF 쿼리: 제목 2번 + summary/본문 앞 400자
+    - 우선: 반대 lean + stance 절대값이 stance_threshold 이상인 애들만
+    - 그런 애들이 없으면 → stance 기준 완화해서 fallback
     """
     from app.services.vector_store import search_similar_with_lean_fallback
-    
+
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -201,9 +187,11 @@ def compute_recommendations(
         b_source, b_lean_db, b_title, b_text, b_date, b_link = base
         b_lean = _infer_lean(b_source, b_link, b_lean_db)
 
-        premise_tfidf = f"{b_title or ''} {(b_text or '')[:1500]}".strip()
+        short_text = (b_text or "")[:400]
+        title_clean = (b_title or "").strip()
+        premise_tfidf = f"{title_clean} {title_clean} {short_text}".strip()
 
-        premise_nli = summarize_text(b_text or b_title, ratio=0.2) or (b_title or "")
+        premise_nli = summarize_text(b_text or b_title, ratio=0.2, hard_cap=600) or (b_title or "")
     finally:
         cur.close()
         conn.close()
@@ -213,13 +201,15 @@ def compute_recommendations(
         base_lean=b_lean,
         base_date=b_date,
         hours_window=hours_window,
-        top_k=50,
+        top_k=80,  
     )
 
     if not hits:
         return {"clicked": normalize_clicked(b_link), "recommendations": []}
 
-    picks = []
+    strong_picks = []
+    weak_picks = []
+
     for h in hits:
         payload = h.payload or {}
         link = payload.get("link")
@@ -234,7 +224,7 @@ def compute_recommendations(
         if b_lean and cand_lean and not _is_opposite_lean(b_lean, cand_lean):
             continue
 
-        hyp = summarize_text(text or title, ratio=0.2) or (title or "")
+        hyp = summarize_text(text or title, ratio=0.2, hard_cap=600) or (title or "")
         try:
             label, probs = nli_infer(premise_nli, hyp)
             eprob, nprob, cprob = float(probs[0]), float(probs[1]), float(probs[2])
@@ -244,31 +234,43 @@ def compute_recommendations(
         stance = cprob - eprob  # [-1, 1]
         stance_norm = max(0.0, min(1.0, (stance + 1.0) / 2.0))
 
+        is_strong = abs(stance) >= stance_threshold
+
         base_w, gain_w = 0.8, 0.2
         sim_score = float(h.score or 0.0)
         score = sim_score * (base_w + gain_w * stance_norm)
 
         out_link = normalize_variant_urls(strip_tracking_params(link or ""))
 
-        picks.append(
-            dict(
-                title=title,
-                link=out_link,
-                source=src,
-                lean=cand_lean,
-                date=date_iso,
-                probs={
-                    "entailment": eprob,
-                    "neutral": nprob,
-                    "contradiction": cprob,
-                },
-                stance=stance,
-                score=score,
-            )
+        item = dict(
+            title=title,
+            link=out_link,
+            source=src,
+            lean=cand_lean,
+            date=date_iso,
+            probs={
+                "entailment": eprob,
+                "neutral": nprob,
+                "contradiction": cprob,
+            },
+            stance=stance,
+            score=score,
         )
 
-    picks.sort(key=lambda x: x["score"], reverse=True)
+        if is_strong:
+            strong_picks.append(item)
+        else:
+            weak_picks.append(item)
+
+    strong_picks.sort(key=lambda x: x["score"], reverse=True)
+    weak_picks.sort(key=lambda x: x["score"], reverse=True)
+
+    merged: list = strong_picks[:topk_return]
+    if len(merged) < topk_return:
+        need = topk_return - len(merged)
+        merged.extend(weak_picks[:need])
+
     return {
         "clicked": normalize_clicked(b_link),
-        "recommendations": picks[:topk_return],
+        "recommendations": merged,
     }

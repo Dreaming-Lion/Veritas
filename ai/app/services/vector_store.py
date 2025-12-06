@@ -26,7 +26,6 @@ logger = logging.getLogger(__name__)
 
 VECTORIZER_PATH = Path("models/tfidf_news.pkl")
 
-# Docker 환경 변수 기반으로 Qdrant 접속
 QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
 COLLECTION = "news_tfidf"
@@ -40,16 +39,14 @@ client = QdrantClient(
 
 def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
     """
-    news 테이블 전체를 대상으로
-      1) TF-IDF vectorizer 학습 및 디스크 저장
-      2) Qdrant에 벡터 + 메타데이터 '배치 업서트'
+    news 전체를 대상으로 TF-IDF 벡터를 만들고 Qdrant에 인덱싱.
 
-    batch_size 로 Qdrant upsert를 쪼개서 타임아웃/메모리 부담을 줄인다.
-
-    매번 호출 시 Qdrant 컬렉션(news_tfidf)을 dim에 맞게 recreate_collection으로
-       '항상' 새로 만든다. (dim 꼬임 방지)
+    - summary 있으면 summary 위주, 없으면 content 일부만 사용
+    - 제목을 2번 넣어서 가중치 ↑
+    - 본문은 앞 400자까지만 사용해서 긴 기사 노이즈 ↓
+    - 매 호출마다 news_tfidf 컬렉션을 현재 dim으로 recreate
     """
-    from app.services.recommend_core import get_conn
+    from app.services.recommend_core import get_conn  
 
     t_global_start = time.time()
 
@@ -60,7 +57,13 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
     try:
         cur.execute(
             """
-            SELECT id, title, COALESCE(content, summary, ''), link, source, lean, date
+            SELECT id,
+                   title,
+                   COALESCE(summary, content, '') AS text_for_vector,
+                   link,
+                   source,
+                   lean,
+                   date
             FROM news
             WHERE link IS NOT NULL
               AND link <> '';
@@ -92,9 +95,21 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
 
     logger.info("[vector_store] step2: TF-IDF fit_transform 시작")
 
-    docs = [(t or "") + " " + ((x or "")[:1500]) for t, x in zip(titles, texts)]
+    docs: List[str] = []
+    for t, x in zip(titles, texts):
+        title = (t or "").strip()
+        body = (x or "").strip()
+        body_short = body[:400]
+        doc = f"{title} {title} {body_short}".strip()
+        docs.append(doc)
 
-    tfidf = TfidfVectorizer(min_df=2, ngram_range=(1, 2))
+    tfidf = TfidfVectorizer(
+        min_df=3,             # 너무 희귀한 단어 제거
+        max_df=0.9,           # 거의 모든 문서에 나오는 단어 제거
+        ngram_range=(1, 2),   # unigram + bigram
+        max_features=20000,   # 상위 2만 개 feature만 사용
+        sublinear_tf=True,    # tf를 log 스케일로
+    )
     X = tfidf.fit_transform(docs)
 
     VECTORIZER_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -168,7 +183,7 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
             payload: Dict[str, Any] = {
                 "id": int(doc_id),
                 "title": title,
-                "content": text,
+                "content": text, 
                 "link": link,
                 "source": src,
                 "lean": lean,
@@ -195,6 +210,7 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
             )
             traceback.print_exc()
             raise
+
         indexed += len(points)
         logger.info(
             "[vector_store] step3: done upsert batch %d ~ %d (누적 indexed=%d)",
@@ -210,7 +226,6 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
         total_time,
     )
 
-    # Qdrant 컬렉션 실제 포인트 개수도 한 번 찍기
     try:
         count_res = client.count(collection_name=COLLECTION, exact=True)
         logger.info(
@@ -225,10 +240,6 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
 
 
 def load_vectorizer() -> TfidfVectorizer:
-    """
-    디스크에서 TF-IDF vectorizer 로드.
-    없으면 에러 발생 (먼저 train_vectorizer_and_index_all 실행 필요).
-    """
     if not VECTORIZER_PATH.exists():
         raise RuntimeError(
             "TF-IDF vectorizer not found. "
@@ -238,9 +249,6 @@ def load_vectorizer() -> TfidfVectorizer:
 
 
 def _opposite_lean_values(base: Optional[str]) -> List[str]:
-    """
-    기준 lean에 따라 '반대편' 성향 리스트를 반환
-    """
     if base == "progressive":
         return ["conservative"]
     if base == "conservative":
@@ -258,19 +266,11 @@ def search_similar_with_lean_fallback(
     hours_window: int,
     top_k: int = 50,
 ):
-    """
-    TF-IDF 쿼리 벡터 기반으로 Qdrant에서 유사 기사 검색.
-
-    1) base_date 기준 시간창(hours_window) 안에서 먼저 필터링
-    2) 기준 기사 정치 성향(base_lean)의 '반대편' lean만 우선 검색
-       - 반대 lean 결과가 하나도 없으면 lean 제한 없이 전체 검색
-    """
     tfidf = load_vectorizer()
     q_vec = tfidf.transform([query_text]).toarray()[0].tolist()
 
     must_conditions: List[FieldCondition] = []
 
-    # 시간 필터 (date_ts 범위)
     if base_date is not None:
         dt_utc = base_date
         if dt_utc.tzinfo is None:
@@ -286,7 +286,6 @@ def search_similar_with_lean_fallback(
             )
         )
 
-    # 1) 먼저 반대 lean만 대상으로 검색 시도
     opp_leans = _opposite_lean_values(base_lean)
     if opp_leans:
         lean_conds = [
@@ -309,7 +308,6 @@ def search_similar_with_lean_fallback(
         if hits:
             return hits
 
-    # 2) 반대 lean 결과가 없으면 lean 제한 없이 전체 검색
     flt_all = Filter(must=must_conditions) if must_conditions else None
     res_all = client.query_points(
         collection_name=COLLECTION,
