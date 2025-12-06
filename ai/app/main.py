@@ -1,16 +1,19 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
+
 from app.api.crawl import init_db, router as article_router
 from app.api.rss_crawl import crawl_rss, router as rss_router
 from app.api.summary import router as summary_router, run_summary_after_crawl
-from app.services.recommend_batch import precompute_recent
 from app.model.model import load_model
 from app.api import article_reco, article_ready
 from app.api.article_meta import router as article_meta_router
+
+from app.services.recommend_batch import build_full_tfidf_index
 
 BOOTSTRAP_DO_CRAWL   = os.getenv("BOOTSTRAP_DO_CRAWL", "1") == "1"
 BOOTSTRAP_LOOKBACK_H = int(os.getenv("BOOTSTRAP_LOOKBACK_H", "720"))
@@ -39,14 +42,12 @@ def job_crawl_all():
         print("[job_crawl_all] 요약 작업 시작")
         run_summary_after_crawl(limit=SUMMARY_LIMIT_AFTER_CRAWL, force=True)
 
-        print(f"[job_crawl_all] 추천 사전계산 시작(24h/최대400)")
-        precompute_recent(lookback_hours=24, max_items=400)
-        print("[job_crawl_all] 추천 사전계산 완료")
-
-
-def job_reco_periodic():
-    print("[job_reco_periodic] 주기적 추천 사전 계산(72h/최대600)")
-    precompute_recent(lookback_hours=72, max_items=600)
+        print("[job_crawl_all] TF-IDF 벡터 인덱스 재구축 시작")
+        try:
+            res = build_full_tfidf_index()
+            print(f"[job_crawl_all] TF-IDF 인덱스 재구축 완료: {res}")
+        except Exception as e:
+            print("[job_crawl_all] TF-IDF 인덱스 재구축 실패:", e)
 
 
 def start_scheduler_once():
@@ -63,15 +64,6 @@ def start_scheduler_once():
         coalesce=True,
     )
 
-    scheduler.add_job(
-        job_reco_periodic,
-        "interval",
-        minutes=30,
-        id="reco_job",
-        max_instances=1,
-        coalesce=True,
-    )
-
     scheduler.start()
     app.state.sched_started = True
     print("[scheduler] started")
@@ -81,16 +73,14 @@ def bootstrap_heavy_jobs():
     print("[bootstrap] heavy bootstrap start")
     try:
         if BOOTSTRAP_DO_CRAWL:
-            print("[bootstrap] 초기 RSS 크롤 + 요약 + 추천(job_crawl_all) 실행")
+            print("[bootstrap] 초기 RSS 크롤 + 요약 + 인덱스(job_crawl_all) 실행")
             job_crawl_all()
         else:
             print("[bootstrap] 초기 크롤 생략(BOOTSTRAP_DO_CRAWL=0)")
 
-        print(f"[bootstrap] 추가 추천 사전계산 시작({BOOTSTRAP_LOOKBACK_H}h/최대{BOOTSTRAP_MAX_ITEMS})")
-        precompute_recent(lookback_hours=BOOTSTRAP_LOOKBACK_H, max_items=BOOTSTRAP_MAX_ITEMS)
-        print("[bootstrap] 추천 사전계산 완료")
     except Exception as e:
         import traceback
+
         print("[bootstrap] ERROR:", e)
         traceback.print_exc()
     finally:
@@ -99,9 +89,8 @@ def bootstrap_heavy_jobs():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("[startup] init_db & ensure_cache_table")
+    print("[startup] init_db")
     init_db()
-    article_reco.ensure_cache_table()
 
     print("[startup] load_model")
     if QUICK_BOOT:
@@ -127,6 +116,7 @@ async def lifespan(app: FastAPI):
     yield
     print("[shutdown] done")
 
+
 app.router.lifespan_context = lifespan
 
 
@@ -139,9 +129,10 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
+
 app.include_router(rss_router,     prefix="/api")
 app.include_router(article_router, prefix="/api")
 app.include_router(summary_router, prefix="/api")
-app.include_router(article_reco.router, prefix="/api")
+app.include_router(article_reco.router,  prefix="/api")
 app.include_router(article_ready.router, prefix="/api")
-app.include_router(article_meta_router, prefix="/api")
+app.include_router(article_meta_router,  prefix="/api")

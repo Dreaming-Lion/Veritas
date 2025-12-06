@@ -55,12 +55,10 @@ def release_lock(cur):
 
 
 # -------------------- 요약 파라미터 & 옵션 --------------------
-# 기본: 2~3줄 요약 느낌 → 3문장 기본
 DEFAULT_MAX_SENTENCES = int(os.getenv("SUMMARY_MAX_SENTENCES", "3"))
 _env_chars = os.getenv("SUMMARY_MAX_CHARS", "").strip()
 DEFAULT_MAX_CHARS: Optional[int] = int(_env_chars) if _env_chars.isdigit() else None
 
-# HF 요약기 옵션 (있으면 사용, 없으면 extractive 사용)
 USE_HF = os.getenv("USE_TRANSFORMERS_SUMMARY", "0") == "1"
 _hf = None
 if USE_HF:
