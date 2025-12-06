@@ -12,7 +12,7 @@
 
 ## 🌞 프로젝트 구현
 
-### 반대 성향 기사 추천
+### 반대 성향 기사 추천 - ver 1
 - 사용자가 클릭한 뉴스 기사의 원본 URL을 추출하여 언론사와 매칭하고, 해당 언론사의 정치 성향(진보/중도/보수)을 추론합니다. 이후 이 성향과 반대되는 정치 성향(ex. 보수 → 진보 / 진보 → 보수 / 중도 → 진보·보수)의 언론사들로만 구성된 뉴스 기사 리스트를 1차 후보 집합으로 만듭니다. 반대 성향 기사가 전혀 없는 경우에만 전체 기사 집합을 사용합니다.
 - 이후, 기준이 되는 클릭 기사의 본문(제목 + 일부 본문)을 TF-IDF로 벡터화하고, 48시간 이내의 반대 성향 기사 리스트와의 코사인 유사도를 계산해 상위 50개의 유사 기사를 1차 후보로 선정합니다.
 - 1차 후보 기사에 대해 NLI 모델(mDeBERTa XNLI)을 사용해 클릭 기사와 수집한 기사 간 논리적 관계를 추론하고, NLI가 반환한 확률(contradiction − entailment)을 기반으로 한 stance 스코어가 특정 임계치 이상인 기사만 최종 추천 목록에 포함하여, 내용적으로 관련이 있으면서도 관점 차이가 존재하는 기사만 남겼습니다.
@@ -29,11 +29,15 @@
 
 <br>
 
-#### 벡터DB 기반 설계와의 비교
-- 일반적인 벡터DB 기반 설계는 수백만 건 이상의 대규모 뉴스 코퍼스를 대상으로 빠른 의미 기반 검색을 수행할 수 있다는 장점이 있습니다. 그러나, 이 방식을 사용하려면 모든 기사에 대해 임베딩 벡터를 생성·저장하고, 실시간으로 유입되는 기사마다 임베딩 모델을 호출해 벡터를 생성한 뒤 벡터 인덱스를 갱신해야 합니다. 이는 모델 호출 비용, GPU/CPU 자원, 인덱싱 시간 측면에서 적지 않은 부담이 됩니다.
-- 예를 들어, 하루 수천 건의 기사가 들어오는 환경에서 벡터DB를 사용할 경우, 임베딩 전용 워커(서버)와 벡터DB 클러스터를 별도로 운영해야 하고, 수백만 건 단위로 뉴스를 축적할 경우 벡터 자체 저장 공간과 인덱스 오버헤드까지 포함해 수십 GB 수준의 메모리/스토리지가 필요할 수 있습니다. 관리형 벡터DB 서비스를 사용할 경우에는 데이터 규모와 QPS에 따라 월 수십~수백 달러 수준의 추가 비용이 발생하는 것이 일반적입니다.
-- 반면, 본 프로젝트는 최근 48시간 이내의 정치 기사에 한정하여 추천을 수행하고, 그 위에 NLI 기반 필터링을 수행하는 구조입니다. 이 정도 규모에서는 매 요청 시 TF-IDF를 재계산하고, 결과를 PostgreSQL의 JSONB 캐시(`article_reco` 테이블)에 저장해 재사용하는 방식만으로도 충분한 응답 속도와 품질을 얻을 수 있습니다. 이때 필요한 인프라는 일반적인 RDB 인스턴스와 애플리케이션 서버 정도로, 별도의 벡터DB 클러스터를 운영하는 것에 비해 하드웨어 자원과 비용 부담이 훨씬 작습니다.
-- 이러한 이유에서 현재 서비스 스케일에서는 TF-IDF + PostgreSQL(JSONB 캐시) 조합이 비용 대비 효용이 더 크다고 판단했으며, 향후 데이터 규모가 수백만 건 단위로 확장되거나 장기 히스토리를 포함한 의미 기반 검색이 필요해질 경우에는 벡터DB 기반 구조로 전환할 수 있습니다.
+### 반대 기사 추천 - ver 2 (최신 버전)
+- 기존 시스템은 캐싱 전략 없이 사용자 클릭 시 추천 연산을 시작하는 구조로 가면, Latency가 커지므로 사용자 편의성이 떨어진다는 문제점이 존재합니다.
+- 따라서 이를 줄이기 위해 새 기사가 들어올 때마다 추천 결과를 미리 계산하여 저장하는 구조를 택하는데, 이로 인해 백그라운드 계산, 배치 계산 파이프라인이 필수적입니다.
+- 캐싱 전략으로 구현 시 수많은 연산을 미리 계산해 두고, 그 결과를 저장하여 재사용 하는 구조를 지닙니다.
+- 모델이나 파라미터 조합마다 추천 결과를 미리 저장하므로캐시 계산 비용이 크고, 모델 교체 시 모든 데이터에 대한 재연산이 필요하여 모델 교체나 튜닝 비용이 크다는 단점이 존재하고, 대규모 데이터에 가까울수록 비효율적인 구조를 지니게 됩니다.
+- 따라서 이를 해결하기 위해 본 시스템에서는 벡터 기반 검색을 기본 연산으로 활용합니다.
+- 이는 새 기사/새 조합에도 매번 동일한 파이프라인을 거쳐 항상 비슷한 Latency를 유지할 수 있습니다.
+- 또한, 새 기사는 임베딩 모델을 거쳐 임베딩 벡터를 생성한 뒤, 벡터DB에 저장하면 곧바로 검색 대상이 되므로 별도의 캐시 만료/재계산 없이도 항상 최신 기사를 포함한 기사 추천이 가능해집니다.
+- 따라서 추천 결과를 미리 계산할 필요가 없어 대규모 데이터 환경에서도 효율적이며, 모델이나 파라미터 조합이 변경되어도 벡터 검색 및 Re-Ranking 과정만 변경하면 되므로 모델 교체나 튜닝 비용이 상대적으로 줄어듭니다.
 
 <br>
 
@@ -90,4 +94,39 @@ feat(frontend): 로그인 페이지 UI 구현
 fix(backend): 사용자 인증 API 버그 수정
 docs: README 업데이트
 style(frontend): 코드 포맷팅 적용
+```
+
+<br>
+
+## 실행 시 유의 사항
+- DB 테이블 오류 발생 시 Git bash에 붙여넣기
+```
+docker compose exec -e PGPASSWORD=apppw -T db \
+  psql -v ON_ERROR_STOP=1 -U appuser -d appdb <<'SQL'
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS public.news (
+  id bigserial PRIMARY KEY
+);
+
+ALTER TABLE public.news
+  ADD COLUMN IF NOT EXISTS source  text,
+  ADD COLUMN IF NOT EXISTS lean    text,
+  ADD COLUMN IF NOT EXISTS title   text,
+  ADD COLUMN IF NOT EXISTS summary text,
+  ADD COLUMN IF NOT EXISTS content text,
+  ADD COLUMN IF NOT EXISTS link    text,
+  ADD COLUMN IF NOT EXISTS "date"  timestamptz,
+  ADD COLUMN IF NOT EXISTS author  text,
+  ADD COLUMN IF NOT EXISTS section text,
+  ADD COLUMN IF NOT EXISTS origin  text DEFAULT 'rss';
+
+CREATE UNIQUE INDEX IF NOT EXISTS news_link_unique ON public.news (link);
+
+CREATE INDEX IF NOT EXISTS idx_news_origin_date ON public.news (origin, "date" DESC);
+CREATE INDEX IF NOT EXISTS idx_news_source      ON public.news (source);
+
+COMMIT;
+SQL
+
 ```
