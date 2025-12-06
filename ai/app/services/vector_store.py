@@ -38,63 +38,6 @@ client = QdrantClient(
 )
 
 
-def _ensure_collection(dim: int):
-    """
-    Qdrant 컬렉션을 dim에 맞게 맞춰줌.
-    - 없으면 새로 생성
-    - 있으면 dim 확인 후 다르면 recreate_collection()으로 갈아엎기
-      (TF-IDF 재학습 시 dim 달라질 수 있으므로 안전하게)
-    """
-    collections = client.get_collections().collections
-    names = {c.name for c in collections}
-
-    if COLLECTION not in names:
-        logger.info(
-            "[vector_store] 컬렉션 %s 이 없어 새로 생성합니다. dim=%d",
-            COLLECTION,
-            dim,
-        )
-        client.recreate_collection(
-            collection_name=COLLECTION,
-            vectors_config=VectorParams(
-                size=dim,
-                distance=Distance.COSINE,
-            ),
-        )
-        return
-
-    info = client.get_collection(COLLECTION)
-    vectors_cfg = info.config.params.vectors
-
-    # 단일 벡터 설정 / 다중 벡터 설정 모두 대응
-    if isinstance(vectors_cfg, VectorParams):
-        existing_dim = vectors_cfg.size
-    else:
-        first_cfg = next(iter(vectors_cfg.values()))
-        existing_dim = first_cfg.size
-
-    if existing_dim != dim:
-        logger.warning(
-            "[vector_store] 컬렉션 %s 벡터 차원 불일치: existing=%d, new=%d. 컬렉션을 재생성합니다.",
-            COLLECTION,
-            existing_dim,
-            dim,
-        )
-        client.recreate_collection(
-            collection_name=COLLECTION,
-            vectors_config=VectorParams(
-                size=dim,
-                distance=Distance.COSINE,
-            ),
-        )
-    else:
-        logger.info(
-            "[vector_store] 컬렉션 %s 이미 존재 & dim 동일: %d",
-            COLLECTION,
-            existing_dim,
-        )
-
-
 def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
     """
     news 테이블 전체를 대상으로
@@ -102,6 +45,9 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
       2) Qdrant에 벡터 + 메타데이터 '배치 업서트'
 
     batch_size 로 Qdrant upsert를 쪼개서 타임아웃/메모리 부담을 줄인다.
+
+    ⚠️ 매번 호출 시 Qdrant 컬렉션(news_tfidf)을 dim에 맞게 recreate_collection으로
+       '항상' 새로 만든다. (dim 꼬임 방지)
     """
     # 순환 import 피하려고 함수 안에서 import
     from app.services.recommend_core import get_conn
@@ -163,8 +109,19 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
         step2_time,
     )
 
-    # 컬렉션 dim 맞추기 (필요시 재생성)
-    _ensure_collection(dim)
+    # 🔥 매번 컬렉션을 dim에 맞게 새로 생성 (dim 꼬임 방지)
+    logger.info(
+        "[vector_store] 컬렉션 %s 를 dim=%d 로 recreate_collection 합니다.",
+        COLLECTION,
+        dim,
+    )
+    client.recreate_collection(
+        collection_name=COLLECTION,
+        vectors_config=VectorParams(
+            size=dim,
+            distance=Distance.COSINE,
+        ),
+    )
 
     total = len(ids)
     logger.info(
@@ -232,7 +189,12 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
             client.upsert(collection_name=COLLECTION, points=points)
         except Exception as e:
             import traceback
-            logger.error("[vector_store] Qdrant upsert 실패 (batch %d ~ %d): %r", start + 1, end, e)
+            logger.error(
+                "[vector_store] Qdrant upsert 실패 (batch %d ~ %d): %r",
+                start + 1,
+                end,
+                e,
+            )
             traceback.print_exc()
             raise
         indexed += len(points)
@@ -242,7 +204,6 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
             end,
             indexed,
         )
-
 
     total_time = time.time() - t_global_start
     logger.info(
