@@ -14,7 +14,7 @@
 
 ## 🌞 프로젝트 구현
 
-<img width="595" height="274" alt="Image" src="https://github.com/user-attachments/assets/4f932101-e528-41e6-b8cf-6e3053c11669" />
+<img width="848" height="396" alt="Image" src="https://github.com/user-attachments/assets/2d90d812-ed9a-4434-bc17-376a8006b75a" />
 
 
 ### 반대 성향 기사 추천 - ver 1
@@ -55,6 +55,8 @@
 - 이후, 유사도 점수가 설정한 임계값(min_sim) 미만인 경우에는 관련성이 낮다고 판단해 추천하지 않도록 합니다.
 - 최종적으로 선택된 문서는 `BriefingInfo` 형태로 가공되며, 주관 부처/기관명, 승인 일시, 제목, 본문 요약, 원문 링크 정보를 기사 상세 화면에서 함께 제공합니다.
 - 이를 통해 사용자는 언론 기사가 다루는 이슈에 대해 실제 발의 법안 및 정부 브리핑 원문을 동시에 참고할 수 있어, 보다 근거 기반의 정치적 판단을 내릴 수 있습니다.
+
+<img width="849" height="413" alt="Image" src="https://github.com/user-attachments/assets/4f12ea02-24bb-485f-9bae-3fb83603cd0c" />
 
 <br>
 
