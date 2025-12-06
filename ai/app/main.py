@@ -37,11 +37,10 @@ scheduler = BackgroundScheduler(timezone="UTC")
 def job_crawl_all():
     print("[job_crawl_all] RSS 뉴스 크롤링 시작")
     try:
-        crawl_rss()
-    finally:
+        # crawl_rss()
         print("[job_crawl_all] 요약 작업 시작")
         run_summary_after_crawl(limit=SUMMARY_LIMIT_AFTER_CRAWL, force=True)
-
+    finally:
         print("[job_crawl_all] TF-IDF 벡터 인덱스 재구축 시작")
         try:
             res = build_full_tfidf_index()

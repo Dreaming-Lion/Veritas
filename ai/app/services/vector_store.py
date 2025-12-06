@@ -31,7 +31,11 @@ QDRANT_HOST = "Veritas-qdrant"
 QDRANT_PORT = 6333
 COLLECTION = "news_tfidf"
 
-client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+client = QdrantClient(
+    host=QDRANT_HOST,
+    port=QDRANT_PORT,
+    timeout=1800.0,  
+)
 
 
 def _ensure_collection(dim: int):
@@ -101,7 +105,7 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
     logger.info("[vector_store] step2: TF-IDF fit_transform 시작")
 
     docs = [(t or "") + " " + ((x or "")[:1500]) for t, x in zip(titles, texts)]
-    
+
     tfidf = TfidfVectorizer(min_df=2, ngram_range=(1, 2))
     X = tfidf.fit_transform(docs)
 
@@ -111,7 +115,9 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
     dim = X.shape[1]
     step2_time = time.time() - t_global_start - step1_time
     logger.info(
-        "[vector_store] step2 완료: dim=%d (TF-IDF 학습 %.2f초 소요)", dim, step2_time
+        "[vector_store] step2 완료: dim=%d (TF-IDF 학습 %.2f초 소요)",
+        dim,
+        step2_time,
     )
 
     _ensure_collection(dim)
@@ -172,6 +178,7 @@ def train_vectorizer_and_index_all(batch_size: int = 1000) -> Dict[str, int]:
             end,
             total,
         )
+
         client.upsert(collection_name=COLLECTION, points=points)
         indexed += len(points)
 
@@ -194,11 +201,6 @@ def load_vectorizer() -> TfidfVectorizer:
 
 
 def _opposite_lean_values(base: Optional[str]) -> List[str]:
-    """
-    base lean에 대해 '반대 성향'으로 취급할 lean 값 목록을 반환.
-      - progressive <-> conservative
-      - centrist 는 진보/보수 모두와 대비
-    """
     if base == "progressive":
         return ["conservative"]
     if base == "conservative":
@@ -216,13 +218,6 @@ def search_similar_with_lean_fallback(
     hours_window: int,
     top_k: int = 50,
 ):
-    """
-    쿼리 텍스트(TF-IDF) 기반으로 유사 기사 검색.
-    1) 먼저 '반대 lean' + 시간창 필터로 검색
-    2) 결과가 하나도 없으면 lean 필터 없이 시간창만으로 다시 검색
-
-    => "반대 성향 기사만 필터링, 없으면 전체 fallback" 로직을 여기서 처리.
-    """
     tfidf = load_vectorizer()
     q_vec = tfidf.transform([query_text]).toarray()[0].tolist()
 
@@ -242,11 +237,11 @@ def search_similar_with_lean_fallback(
             )
         )
 
-    # lean 필터링
     opp_leans = _opposite_lean_values(base_lean)
     if opp_leans:
         lean_conds = [
-            FieldCondition(key="lean", match=MatchValue(value=val)) for val in opp_leans
+            FieldCondition(key="lean", match=MatchValue(value=val))
+            for val in opp_leans
         ]
         flt_opp = Filter(
             must=must_conditions,
@@ -255,25 +250,21 @@ def search_similar_with_lean_fallback(
 
         res = client.query_points(
             collection_name=COLLECTION,
-            query=q_vec,          
+            query=q_vec,
             query_filter=flt_opp,
             limit=top_k,
             with_payload=True,
         )
-
-        hits = res.points      
+        hits = res.points
         if hits:
             return hits
 
-        flt_all = Filter(must=must_conditions) if must_conditions else None
-
-        res_all = client.query_points(
-            collection_name=COLLECTION,
-            query=q_vec,
-            query_filter=flt_all,
-            limit=top_k,
-            with_payload=True,
-        )
-
-        return res_all.points
-
+    flt_all = Filter(must=must_conditions) if must_conditions else None
+    res_all = client.query_points(
+        collection_name=COLLECTION,
+        query=q_vec,
+        query_filter=flt_all,
+        limit=top_k,
+        with_payload=True,
+    )
+    return res_all.points
