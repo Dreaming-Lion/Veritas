@@ -28,7 +28,9 @@ const formatRelativeKorean = (iso?: string | null): string => {
   const yy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
-  const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(
+    d.getMinutes()
+  ).padStart(2, "0")}`;
   return `${yy}.${mm}.${dd} ${hhmm}`;
 };
 
@@ -40,6 +42,70 @@ const useNowTick = (intervalMs = 60_000) => {
     return () => clearInterval(id);
   }, [intervalMs]);
 };
+
+/* ===== 텍스트 정리 유틸 (메인/디테일과 비슷하게) ===== */
+const decodeHTMLEntities = (s?: string | null): string => {
+  if (!s) return "";
+  let out = s;
+  for (let i = 0; i < 3; i++) {
+    const ta = document.createElement("textarea");
+    ta.innerHTML = out;
+    const next = ta.value;
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+};
+
+const formatArticleText = (raw?: string | null): string => {
+  let t = decodeHTMLEntities(raw);
+  t = t.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  t = t.replace(/\\n/g, "\n").replace(/\\t/g, "  ").replace(/\u00a0/g, " ");
+  t = t.replace(/\s+\n/g, "\n");
+  t = t.replace(/\n{3,}/g, "\n\n");
+  return t.trim();
+};
+
+const firstSentences = (text: string, max = 2): string => {
+  const s = formatArticleText(text);
+  if (!s) return "";
+  const bits = s
+    .split(/(?<=[\.!?]|…|”|\"|다\.|요\.)\s+/g)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  return bits.slice(0, Math.max(1, max)).join(" ");
+};
+
+const MAX_EXCERPT_LEN = 90;
+
+const clampExcerpt = (s: string, max = MAX_EXCERPT_LEN): string => {
+  const base = (s || "").trim();
+  if (!base) return "본문 미리보기가 없습니다.";
+  if (base.length <= max) return base;
+  return base.slice(0, max) + "…";
+};
+
+const makeBookmarkExcerpt = (item: Article): string => {
+  // hook/useBookmarks 쪽 타입에 content 없을 수도 있어서 any로 방어
+  const rawContent = (item as any).content ?? "";
+  const raw = rawContent || item.excerpt || "";
+
+  // 1) 앞 1~2문장 추출
+  const fromSentences = firstSentences(raw, 2);
+  if (fromSentences) {
+    return clampExcerpt(fromSentences);
+  }
+
+  // 2) 문장 split이 잘 안 됐을 때, 전체 텍스트 정리 후 자르기
+  const cleaned = formatArticleText(raw);
+  if (cleaned) {
+    return clampExcerpt(cleaned);
+  }
+
+  // 3) 완전 없으면 기본 문구
+  return "본문 미리보기가 없습니다.";
+};
+
 
 /* ===== 공용 북마크 버튼 ===== */
 const BookmarkButton: React.FC<{ saved: boolean; onToggle: () => void }> = ({
@@ -90,6 +156,7 @@ const BookmarkCard: React.FC<{
 }> = ({ item, onToggle, saved }) => {
   useNowTick();
   const relative = formatRelativeKorean(item.time);
+  const excerpt = React.useMemo(() => makeBookmarkExcerpt(item), [item]);
 
   return (
     <div
@@ -122,14 +189,14 @@ const BookmarkCard: React.FC<{
         {item.title}
       </h2>
 
-      {/* 요약 */}
+      {/* 요약 (앞 1~2문장 fallback) */}
       <p
         className="
           text-gray-600 text-sm leading-relaxed line-clamp-2
           min-h-[3.25rem] mb-4
         "
       >
-        {item.excerpt}
+        {excerpt}
       </p>
 
       <div className="mt-auto flex items-center justify-between text-sm pt-2">
