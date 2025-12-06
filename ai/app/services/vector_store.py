@@ -252,22 +252,28 @@ def search_similar_with_lean_fallback(
             must=must_conditions,
             should=lean_conds,
         )
-        hits = client.search(
+
+        res = client.query_points(
             collection_name=COLLECTION,
-            query_vector=q_vec,
-            limit=top_k,
+            query=q_vec,          
             query_filter=flt_opp,
+            limit=top_k,
             with_payload=True,
         )
+
+        hits = res.points      
         if hits:
             return hits
 
-    flt_all = Filter(must=must_conditions) if must_conditions else None
-    hits_all = client.search(
-        collection_name=COLLECTION,
-        query_vector=q_vec,
-        limit=top_k,
-        query_filter=flt_all,
-        with_payload=True,
-    )
-    return hits_all
+        flt_all = Filter(must=must_conditions) if must_conditions else None
+
+        res_all = client.query_points(
+            collection_name=COLLECTION,
+            query=q_vec,
+            query_filter=flt_all,
+            limit=top_k,
+            with_payload=True,
+        )
+
+        return res_all.points
+
