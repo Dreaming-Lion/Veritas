@@ -1,6 +1,6 @@
 # Veritas
 
-<img width="873" height="409" alt="Image" src="https://github.com/user-attachments/assets/78606f01-c6cf-4991-a2cc-44be772bf882" />
+<img width="882" height="423" alt="Image" src="https://github.com/user-attachments/assets/2171e4b3-7ae5-44ab-ac26-7d4fe5307ff1" />
 
 ## 🌞 프로젝트 소개
 - Veritas는 미디어 리터러시 역량 강화를 위한 정치 뉴스 플랫폼입니다.
