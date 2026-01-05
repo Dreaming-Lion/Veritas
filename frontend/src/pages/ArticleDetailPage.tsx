@@ -9,6 +9,8 @@ type ApiArticle = {
   content: string | null;
   date: string | null;
   link: string | null;
+  // detail API에 summary를 안 내려줘도 상관 없지만, 있으면 써먹을 수 있게 해둠
+  summary?: string | null;
 };
 
 type KeyClaim = { text: string };
@@ -203,8 +205,8 @@ const ArticleDetailPage: React.FC = () => {
   const [briefing, setBriefing] = React.useState<BriefingInfo | null>(null);
   const [metaLoaded, setMetaLoaded] = React.useState(false);
 
-  // summary 전용 상태
-  const [summary, setSummary] = React.useState<string | null>(null);
+  // 요약: API에서 raw를 받아오고, 렌더 시 2~3문장으로 클립
+  const [summaryRaw, setSummaryRaw] = React.useState<string>("");
   const [summaryLoading, setSummaryLoading] = React.useState<boolean>(false);
   const [summaryErr, setSummaryErr] = React.useState<string | null>(null);
 
@@ -243,6 +245,51 @@ const ArticleDetailPage: React.FC = () => {
     };
   }, [paramId, previewLink]);
 
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setSummaryLoading(true);
+        setSummaryErr(null);
+        setSummaryRaw("");
+
+        // 1) id 기반
+        let res = await fetch(`${API_BASE}/article/${paramId}/summary?strict=false`);
+        if (!res.ok && previewLink) {
+          res = await fetch(
+            `${API_BASE}/article/summary/by-link?link=${encodeURIComponent(previewLink)}&strict=false`
+          );
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const json: SummaryResponse = await res.json();
+        if (!mounted) return;
+
+        setSummaryRaw(json?.summary ?? "");
+      } catch (e: any) {
+        if (!mounted) return;
+        setSummaryErr(e?.message ?? "summary load failed");
+      } finally {
+        if (mounted) setSummaryLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [paramId, previewLink]);
+
+  const summaryText = React.useMemo(() => {
+    const fromApi = firstSentences(summaryRaw || "", 3);
+    if (fromApi) return fromApi;
+
+    const fromContent =
+      firstSentences(data?.summary ?? "", 3) ||
+      firstSentences(data?.content ?? "", 3) ||
+      firstSentences(preview?.excerpt ?? "", 3);
+
+    return fromContent;
+  }, [summaryRaw, data?.summary, data?.content, preview?.excerpt]);
+
   /* ---------------------- 메타 정보 ---------------------- */
   React.useEffect(() => {
     let mounted = true;
@@ -270,60 +317,6 @@ const ArticleDetailPage: React.FC = () => {
       mounted = false;
     };
   }, [paramId, previewLink]);
-
-  /* ---------------------- 요약 호출 (무조건 2~3문장만) ---------------------- */
-  React.useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setSummaryLoading(true);
-        setSummaryErr(null);
-
-        let res = await fetch(`${API_BASE}/article/${paramId}/summary?strict=false`);
-        if (!res.ok && previewLink) {
-          res = await fetch(
-            `${API_BASE}/article/summary/by-link?link=${encodeURIComponent(previewLink)}&strict=false`
-          );
-        }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        const json: SummaryResponse = await res.json();
-
-        // 🔹 서버 summary를 받아도, 항상 앞에서 2~3문장으로 잘라서 사용
-        const serverSummaryRaw = formatArticleText(json?.summary ?? "");
-        const clipped = firstSentences(
-          serverSummaryRaw || data?.content || preview?.excerpt || "",
-          3, // 최대 3문장
-        );
-
-        if (!mounted) return;
-
-        if (clipped) {
-          setSummary(clipped);
-        } else {
-          // 서버 요약이 비거나 이상할 때 content/excerpt에서 fallback
-          const fallback =
-            firstSentences(data?.content ?? "", 3) ||
-            firstSentences(preview?.excerpt ?? "", 3);
-          setSummary(fallback || null);
-        }
-      } catch (e: any) {
-        if (!mounted) return;
-        setSummaryErr(e?.message ?? "summary load failed");
-
-        // 에러가 나도 content/excerpt에서 앞 2~3문장 fallback
-        const fallback =
-          firstSentences(data?.content ?? "", 3) ||
-          firstSentences(preview?.excerpt ?? "", 3);
-        setSummary(fallback || null);
-      } finally {
-        if (mounted) setSummaryLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [paramId, previewLink, data?.content, preview?.excerpt]);
 
   /* ---------------------- 반대 의견 추천: 자동 라이브 조회 ---------------------- */
   const originalUrl = (data?.link ?? preview?.link ?? "").replace(/&amp;/g, "&");
@@ -367,6 +360,7 @@ const ArticleDetailPage: React.FC = () => {
       return;
     }
 
+    const controller = new AbortController();
     const top3 = (r.recommendations || [])
       .slice()
       .filter((x: any) => (x?.score ?? 0) >= 0.1)
@@ -377,30 +371,20 @@ const ArticleDetailPage: React.FC = () => {
       top3.map(async (it) => {
         const url = (it.link || "").replace(/&amp;/g, "&");
         let sum = "";
-
-        // 🔹 반대 기사 요약: API + fallback
         try {
           const sres = await fetch(
-            `${API_BASE}/article/summary/by-link?link=${encodeURIComponent(url)}&strict=false`
+            `${API_BASE}/article/summary/by-link?link=${encodeURIComponent(url)}&strict=false`,
+            { signal: controller.signal }
           );
           if (sres.ok) {
             const sj: SummaryResponse = await sres.json();
-            const raw = sj?.summary ?? "";
-            // 서버 요약이 길어도 항상 1~2문장만 사용
-            sum = firstSentences(raw, 2);
+            sum = firstSentences(formatArticleText(sj?.summary ?? ""), 2);
           }
         } catch {
           /* ignore */
         }
-
-        // summary API가 비었거나 실패했을 때: 제목 기반 한 줄 요약 fallback
-        if (!sum) {
-          sum = firstSentences(it.title ?? "", 1);
-        }
-
         const press = it.source || hostToPress(url) || "언론사";
         const s = Number(it.score ?? 0);
-
         return {
           title: cleanTitle(it.title),
           url,
@@ -430,6 +414,8 @@ const ArticleDetailPage: React.FC = () => {
   const displayDate = data?.date ? isoToLocal(data.date) : preview?.time || "";
   const previewExcerpt = formatArticleText(preview?.excerpt ?? "");
   const content = formatArticleText(data?.content ?? "") || previewExcerpt;
+
+  const hasAnySummaryText = !!summaryText && summaryText.trim().length > 0;
 
   return (
     <div
@@ -481,10 +467,10 @@ const ArticleDetailPage: React.FC = () => {
               <div className="p-4">
                 {summaryLoading ? (
                   <div className="animate-pulse rounded-lg bg-blue-50/70 border border-blue-100 h-[64px]" />
-                ) : summary ? (
+                ) : hasAnySummaryText ? (
                   <div className="rounded-lg bg-blue-50/70 border border-blue-100">
                     <div className="border-l-4 border-blue-300 px-4 py-3 text-blue-900/90 whitespace-pre-wrap">
-                      {summary}
+                      {summaryText}
                     </div>
                   </div>
                 ) : (
@@ -524,11 +510,7 @@ const ArticleDetailPage: React.FC = () => {
                             </span>
                           </div>
                           <p className="mt-1 font-semibold text-orange-900">{it.title}</p>
-                          {it.summary && (
-                            <p className="mt-1 text-sm text-orange-800/90">
-                              {it.summary}
-                            </p>
-                          )}
+                          {it.summary && <p className="mt-1 text-sm text-orange-800/90">{it.summary}</p>}
                         </div>
                       </a>
                     ))}
@@ -541,13 +523,12 @@ const ArticleDetailPage: React.FC = () => {
               </div>
             </Card>
 
-            {/* 관련 법안 */}
+            {/* 관련 발의 법안 */}
             <Card interactive>
               <SectionHeader icon={<span className="!text-purple-600">{Icon.bill}</span>} title="관련 발의 법안 정보" />
               <div className="p-4">
                 {metaLoaded ? (
                   bill ? (
-                    // bill 정보가 있을 때
                     <div className="rounded-lg bg-purple-50/60 border border-purple-100">
                       <div className="border-l-4 border-purple-400 px-4 py-3 space-y-3 text-purple-950/90">
                         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -578,7 +559,6 @@ const ArticleDetailPage: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    // meta는 불러왔는데 bill이 없는 경우
                     <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-gray-600">
                       관련 발의 법안 정보가 없습니다.
                       <br />
@@ -586,7 +566,6 @@ const ArticleDetailPage: React.FC = () => {
                     </div>
                   )
                 ) : (
-                  // 아직 /meta 응답을 못 받은 상태
                   <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-gray-600">
                     발의 법안 정보를 불러오는 중입니다.
                   </div>
@@ -600,7 +579,6 @@ const ArticleDetailPage: React.FC = () => {
               <div className="p-4">
                 {metaLoaded ? (
                   briefing ? (
-                    // 브리핑 있을 때
                     <div className="rounded-lg bg-green-50/60 border border-green-100">
                       <div className="border-l-4 border-green-400 px-4 py-3 space-y-2 text-green-950/90">
                         <div className="text-sm">
@@ -636,13 +614,13 @@ const ArticleDetailPage: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    // 브리핑이 null인 경우
                     <div className="rounded-lg bg-gray-50 border border-green-100 px-4 py-3 text-gray-600">
-                      브리핑 정보가 없습니다.<br />이 기사는 정부 공식 브리핑과 직접적으로 연계되지 않았을 수 있습니다.
+                      브리핑 정보가 없습니다.
+                      <br />
+                      이 기사는 정부 공식 브리핑과 직접적으로 연계되지 않았을 수 있습니다.
                     </div>
                   )
                 ) : (
-                  // API 로딩 중이거나, API가 실패한 경우
                   <div className="rounded-lg bg-gray-50 border border-green-100 px-4 py-3 text-gray-600">
                     브리핑 정보를 불러오는 중입니다.
                   </div>
