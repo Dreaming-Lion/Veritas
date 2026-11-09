@@ -1,0 +1,58 @@
+{
+ "full_first_run": {
+  "indexed": 582,
+  "seconds": 177.20629915699828,
+  "wall": 177.2099474099996
+ },
+ "points_after_full": 582,
+ "noop_run": {
+  "indexed": 0,
+  "seconds": 0.14862961700055166,
+  "wall": 0.14875120600117953
+ },
+ "incremental_20": {
+  "indexed": 20,
+  "seconds": 3.699425014998269,
+  "wall": 3.699732856002811,
+  "per_article_sec": 0.18498664280014054
+ },
+ "incremental_1": {
+  "indexed": 1,
+  "seconds": 0.2512072450008418,
+  "wall": 0.2512394699988363
+ },
+ "count_after_incremental": 582,
+ "purge_30d": {
+  "purged": 1,
+  "remaining": 581,
+  "wall": 0.06198376899919822
+ },
+ "count_after_purge": 581,
+ "reco_vs_benchmark_top5": [
+  [
+   3,
+   5,
+   5
+  ],
+  [
+   4,
+   5,
+   5
+  ],
+  [
+   7,
+   5,
+   5
+  ],
+  [
+   9,
+   5,
+   5
+  ],
+  [
+   12,
+   5,
+   5
+  ]
+ ]
+}

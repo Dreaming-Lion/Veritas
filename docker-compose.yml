@@ -88,6 +88,7 @@ services:
       NA_BILL_KEY: ${NA_BILL_KEY}
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
+      RECO_ENGINE: ${RECO_ENGINE:-v2}   # v2 | v2plus (임베딩 + 증분 인덱싱, README 참고)
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8001/health || exit 1"]
       interval: 10s

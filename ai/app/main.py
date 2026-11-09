@@ -41,12 +41,20 @@ def job_crawl_all():
         print("[job_crawl_all] 요약 작업 시작")
         run_summary_after_crawl(limit=SUMMARY_LIMIT_AFTER_CRAWL, force=True)
     finally:
-        print("[job_crawl_all] TF-IDF 벡터 인덱스 재구축 시작")
-        try:
-            res = build_full_tfidf_index()
-            print(f"[job_crawl_all] TF-IDF 인덱스 재구축 완료: {res}")
-        except Exception as e:
-            print("[job_crawl_all] TF-IDF 인덱스 재구축 실패:", e)
+        if os.getenv("RECO_ENGINE", "v2") == "v2plus":
+            print("[job_crawl_all] v2+ 증분 인덱싱(새 기사 upsert + 오래된 기사 삭제) 시작")
+            try:
+                from app.services.recommend_v2plus import run_incremental
+                print(f"[job_crawl_all] v2+ 증분 인덱싱 완료: {run_incremental()}")
+            except Exception as e:
+                print("[job_crawl_all] v2+ 증분 인덱싱 실패:", e)
+        else:
+            print("[job_crawl_all] TF-IDF 벡터 인덱스 재구축 시작")
+            try:
+                res = build_full_tfidf_index()
+                print(f"[job_crawl_all] TF-IDF 인덱스 재구축 완료: {res}")
+            except Exception as e:
+                print("[job_crawl_all] TF-IDF 인덱스 재구축 실패:", e)
 
 
 def start_scheduler_once():
