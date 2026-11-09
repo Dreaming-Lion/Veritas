@@ -4,9 +4,20 @@ from fastapi.encoders import jsonable_encoder
 from datetime import timedelta, datetime, timezone
 import psycopg2, psycopg2.extras
 
-from app.services.recommend_core import get_conn, compute_recommendations, normalize_clicked
+import os
+
+from app.services.recommend_core import get_conn, compute_recommendations as _compute_v2, normalize_clicked
 
 router = APIRouter()
+
+
+def compute_recommendations(*args, **kwargs):
+    """RECO_ENGINE=v2plus 이면 개선판(recommend_v2plus), 아니면 기존 v2."""
+    if os.getenv("RECO_ENGINE", "v2") == "v2plus":
+        from app.services.recommend_v2plus import compute_recommendations_v2plus
+        return compute_recommendations_v2plus(*args, **kwargs)
+    return _compute_v2(*args, **kwargs)
+
 CACHE_TTL_HOURS = 6
 
 DDL_SQL = """

@@ -1,0 +1,25 @@
+held-out 15 bases
+v1 returned 75 fit 47 (63%) bases hit 12 empty 0
+v2 returned 70 fit 30 (43%) bases hit 10 empty 1
+v2plus returned 75 fit 42 (56%) bases hit 12 empty 0
+answerable [15, 16, 17, 19, 20, 21, 22, 23, 24, 25, 27, 29]
+v1 answerable fit 47/60 (78%)
+v2 answerable fit 30/60 (50%)
+v2plus answerable fit 42/60 (70%)
+15 {'v1': (3, 5), 'v2': (2, 5), 'v2plus': (3, 5)}
+16 {'v1': (3, 5), 'v2': (2, 5), 'v2plus': (4, 5)}
+17 {'v1': (5, 5), 'v2': (5, 5), 'v2plus': (5, 5)}
+18 {'v1': (0, 5), 'v2': (0, 5), 'v2plus': (0, 5)}
+19 {'v1': (5, 5), 'v2': (5, 5), 'v2plus': (4, 5)}
+20 {'v1': (4, 5), 'v2': (4, 5), 'v2plus': (4, 5)}
+21 {'v1': (5, 5), 'v2': (2, 5), 'v2plus': (3, 5)}
+22 {'v1': (5, 5), 'v2': (2, 5), 'v2plus': (5, 5)}
+23 {'v1': (4, 5), 'v2': (0, 5), 'v2plus': (4, 5)}
+24 {'v1': (2, 5), 'v2': (2, 5), 'v2plus': (2, 5)}
+25 {'v1': (3, 5), 'v2': (4, 5), 'v2plus': (4, 5)}
+26 {'v1': (0, 5), 'v2': (0, 0), 'v2plus': (0, 5)}
+27 {'v1': (5, 5), 'v2': (0, 5), 'v2plus': (1, 5)}
+28 {'v1': (0, 5), 'v2': (0, 5), 'v2plus': (0, 5)}
+29 {'v1': (3, 5), 'v2': (2, 5), 'v2plus': (3, 5)}
+v2+ dense hybrid time mean 9.4 p95 10.8
+v1 mean 46.3 v2 mean 36.4 v2 empty 1
